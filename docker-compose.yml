@@ -1,0 +1,37 @@
+version: "3.9"
+
+services:
+  # Neo4j Graph Database
+  neo4j:
+    image: neo4j:5.15-community
+    container_name: a2a-neo4j
+    ports:
+      - "7474:7474" # HTTP
+      - "7687:7687" # Bolt
+    environment:
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:-password}
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_dbms_memory_heap_max__size=2G
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+      - neo4j-import:/var/lib/neo4j/import
+      - neo4j-plugins:/plugins
+    # healthcheck:
+    #   test: ["CMD-SHELL", "cypher-shell -u neo4j -p $${NEO4J_PASSWORD:-password} 'RETURN 1'"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
+    networks:
+      - a2a-network
+
+volumes:
+  neo4j-data:
+  neo4j-logs:
+  neo4j-import:
+  neo4j-plugins:
+
+networks:
+  a2a-network:
+    driver: bridge

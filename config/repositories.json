@@ -1,0 +1,34 @@
+{
+  "repositories": [
+    {
+      "owner": "cortside",
+      "name": "coeus",
+      "enabled": true
+    },
+    {
+      "owner": "cortside",
+      "name": "cortside.mockserver",
+      "enabled": true
+    },
+    {
+      "owner": "cortside",
+      "name": "cortside.common",
+      "enabled": true
+    },
+    {
+      "owner": "cortside",
+      "name": "cortside.aspnetcore",
+      "enabled": true
+    },
+    {
+      "owner": "cortside",
+      "name": "cortside.restapiclient",
+      "enabled": true
+    }
+  ],
+  "defaultBranch": "develop",
+  "cacheExpirationHours": 24,
+  "includeTopics": [],
+  "excludeTopics": ["archived"],
+  "minStars": 0
+}

@@ -1,86 +1,105 @@
 # Development Phases Plan
 
 ## Date
+
 October 22, 2025
 
 ## Overview
+
 This document breaks down the development of the A2A multi-agent system into manageable phases, with clear milestones, deliverables, and success criteria for each phase.
 
 ---
 
 ## Phase 0: Infrastructure Setup
+
 **Duration**: 1-2 weeks  
 **Goal**: Set up development environment, databases, and foundational infrastructure
 
 ### Tasks
 
 #### 1. Project Initialization
+
 - [x] Create project structure
-- [ ] Initialize TypeScript monorepo
-- [ ] Set up package.json with dependencies
-- [ ] Configure tsconfig.json
-- [ ] Set up ESLint and Prettier
-- [ ] Configure Git and .gitignore
+- [x] Initialize TypeScript monorepo
+- [x] Set up package.json with dependencies
+- [x] Configure tsconfig.json
+- [x] Set up ESLint and Prettier
+- [x] Configure Git and .gitignore
 
 #### 2. Database Setup
-- [ ] Set up PostgreSQL with Docker
-  - Create docker-compose.yml
-  - Configure database initialization scripts
-  - Enable pgvector extension
-- [ ] Set up Neo4j with Docker
-  - Add Neo4j to docker-compose.yml
-  - Configure initialization scripts
-  - Create constraints and indexes
-- [ ] Create database migration framework
-  - Install migration tool (node-pg-migrate)
-  - Create initial migration scripts
-  - Test migration rollback
+
+- [x] Set up PostgreSQL (using existing dh02 instance)
+  - Created schema.sql with all tables
+  - Configured database client
+  - Enabled pgvector extension support
+- [x] Set up Neo4j with Docker
+  - Added Neo4j to docker-compose.yml
+  - Created neo4j-schema.cypher
+  - Created constraints and indexes
+- [x] Create database setup scripts
+  - Created setup.ts for schema initialization
+  - Created seed.ts for test data
+  - Created reset.ts for cleanup
+  - Migration framework deferred to Phase 1
 
 #### 3. Development Environment
-- [ ] Create .env.local template
-- [ ] Set up environment variable loading
-- [ ] Configure development scripts (start, build, test)
-- [ ] Set up hot-reload for development
+
+- [x] Create .env.template
+- [x] Set up environment variable loading (dotenv + zod validation)
+- [x] Configure development scripts (dev, build, test)
+- [x] Set up hot-reload for development (tsx watch)
 - [ ] Configure debugging in VS Code
 
 #### 4. Basic Project Structure
+
 ```
-src/
-├── agents/
-│   ├── base/              # Base agent class
-│   └── types.ts           # Agent type definitions
+packages/
 ├── backend/
-│   ├── database/          # Database clients
-│   └── config/            # Configuration management
-├── shared/
-│   ├── types/             # Shared TypeScript types
-│   └── utils/             # Utility functions
-└── tests/
-    └── setup.ts           # Test configuration
+│   └── src/
+│       ├── agents/        # Agent implementations (Phase 1+)
+│       ├── config/        # Configuration management ✅
+│       ├── database/      # Database clients ✅
+│       └── index.ts       # Fastify server ✅
+├── frontend/              # React UI (Phase 6)
+└── shared/
+    └── src/
+        ├── types.ts       # Shared TypeScript types ✅
+        ├── config.ts      # Configuration schemas ✅
+        └── errors.ts      # Error classes ✅
 ```
 
 ### Deliverables
+
 - ✅ Monorepo with TypeScript configuration
-- ✅ Docker Compose with PostgreSQL and Neo4j
+- ✅ Docker Compose with Neo4j (PostgreSQL on dh02)
 - ✅ Database schemas implemented
 - ✅ Environment configuration system
-- ✅ Basic CI/CD pipeline
+- ✅ Database setup/seed/reset scripts
+- ✅ Basic Fastify API server
+- ⏭️ Basic CI/CD pipeline (deferred)
 
 ### Success Criteria
-- All databases accessible and initialized
-- TypeScript compiles without errors
-- Can run `npm start` and access databases
-- Environment variables loaded correctly
+
+- ✅ PostgreSQL accessible and schema ready
+- ✅ Neo4j in Docker with schema ready
+- ✅ TypeScript configuration complete
+- ✅ Can run database scripts via npm
+- ✅ Environment variables loaded with validation
+- ✅ Basic API server starts successfully
+
+**Phase 0 Status**: ✅ COMPLETED (October 27, 2025)
 
 ---
 
 ## Phase 1: Core Agent Framework
+
 **Duration**: 2-3 weeks  
 **Goal**: Build the foundational agent system with LangGraph integration
 
 ### Tasks
 
 #### 1. Base Agent Implementation
+
 - [ ] Create BaseAgent abstract class
   - Message handling
   - State management
@@ -92,6 +111,7 @@ src/
   - Agent pool management
 
 #### 2. LangGraph Integration
+
 - [ ] Set up LangGraph runtime
 - [ ] Implement shared state schema
 - [ ] Configure checkpointing with PostgreSQL
@@ -99,6 +119,7 @@ src/
 - [ ] Implement state validation
 
 #### 3. Message System
+
 - [ ] Implement message queue
 - [ ] Create message router
 - [ ] Build message validation
@@ -106,6 +127,7 @@ src/
 - [ ] Add message tracing/logging
 
 #### 4. Developer Agent (MVP)
+
 - [ ] Implement basic Developer Agent
   - Query reception
   - Simple task decomposition
@@ -115,6 +137,7 @@ src/
 - [ ] Implement basic coordination strategies
 
 ### Deliverables
+
 - ✅ BaseAgent class with full lifecycle
 - ✅ LangGraph integration with checkpointing
 - ✅ Message system with routing and persistence
@@ -122,6 +145,7 @@ src/
 - ✅ Unit tests for core components
 
 ### Success Criteria
+
 - Can spawn and destroy agents
 - Agents can send/receive messages
 - State is properly checkpointed
@@ -131,12 +155,14 @@ src/
 ---
 
 ## Phase 2: GitHub Agent
+
 **Duration**: 2 weeks  
 **Goal**: Implement GitHub repository discovery and metadata extraction
 
 ### Tasks
 
 #### 1. GitHub API Integration
+
 - [ ] Create GitHub API client
   - Authentication (token-based)
   - Rate limit tracking
@@ -148,6 +174,7 @@ src/
   - Implement cache expiration
 
 #### 2. Repository Discovery
+
 - [ ] Implement repository search
   - Search by name/owner
   - Search by topics
@@ -158,9 +185,10 @@ src/
   - Handle invalid repositories
 
 #### 3. Repository Type Detection
+
 - [ ] Implement detection logic
-  - C# API detection (*.csproj, Controllers/)
-  - C# Library detection (*.csproj, no Program.cs)
+  - C# API detection (\*.csproj, Controllers/)
+  - C# Library detection (\*.csproj, no Program.cs)
   - Node API detection (package.json with express/fastify)
   - React detection (package.json with react)
   - Angular detection (angular.json)
@@ -168,6 +196,7 @@ src/
 - [ ] Handle ambiguous cases
 
 #### 4. GitHub Agent Implementation
+
 - [ ] Implement GitHubAgent class
 - [ ] Add repository fetching
 - [ ] Add file fetching on-demand
@@ -175,6 +204,7 @@ src/
 - [ ] Add alerting for rate limit warnings
 
 ### Deliverables
+
 - ✅ GitHub Agent with full functionality
 - ✅ Repository type detection
 - ✅ Rate limiting and caching
@@ -182,6 +212,7 @@ src/
 - ✅ Integration tests with real GitHub API (using test repos)
 
 ### Success Criteria
+
 - Can fetch repository metadata
 - Correctly detects repository types (>90% accuracy on test set)
 - Respects rate limits
@@ -191,12 +222,14 @@ src/
 ---
 
 ## Phase 3: Repository Agents
+
 **Duration**: 3-4 weeks  
 **Goal**: Implement specialized repository agents with semantic search
 
 ### Tasks
 
 #### 1. Base Repository Agent
+
 - [ ] Create BaseRepositoryAgent class
   - Extends BaseAgent
   - Common indexing logic
@@ -210,6 +243,7 @@ src/
   - Store in pgvector
 
 #### 2. Embedding & Vector Search
+
 - [ ] Set up OpenAI embeddings integration
 - [ ] Implement chunking strategies
   - Code-aware chunking
@@ -221,6 +255,7 @@ src/
   - Result ranking
 
 #### 3. Specialized Repository Agents
+
 - [ ] C# API Agent
   - ASP.NET Core specific analysis
   - Controller detection
@@ -243,12 +278,14 @@ src/
   - Router configuration analysis
 
 #### 4. Agent Lifecycle & Caching
+
 - [ ] Implement TTL management
 - [ ] Create agent pool
 - [ ] Add agent reuse logic
 - [ ] Implement cleanup on TTL expiry
 
 #### 5. Dependency Analysis
+
 - [ ] Parse package.json (Node)
 - [ ] Parse .csproj files (C#)
 - [ ] Extract direct dependencies
@@ -256,6 +293,7 @@ src/
 - [ ] Store in database
 
 ### Deliverables
+
 - ✅ Five specialized repository agents
 - ✅ Semantic search with OpenAI embeddings
 - ✅ Agent pooling with TTL management
@@ -263,6 +301,7 @@ src/
 - ✅ Comprehensive test suite
 
 ### Success Criteria
+
 - Agents correctly analyze their respective repository types
 - Semantic search returns relevant results (>80% relevance)
 - Agent reuse reduces initialization time by >70%
@@ -272,24 +311,28 @@ src/
 ---
 
 ## Phase 4: Relationship Agent & Knowledge Graph
+
 **Duration**: 2-3 weeks  
 **Goal**: Build knowledge graph and implement relationship discovery
 
 ### Tasks
 
 #### 1. Neo4j Integration
+
 - [ ] Create Neo4j client
 - [ ] Implement connection pooling
 - [ ] Create query builders
 - [ ] Add error handling and retry logic
 
 #### 2. Graph Schema Implementation
+
 - [ ] Create node types (Repository, Package, API, Service)
 - [ ] Create relationship types
 - [ ] Implement constraint creation
 - [ ] Create indexes for performance
 
 #### 3. Relationship Discovery
+
 - [ ] Direct dependency tracking
   - Parse dependency files
   - Create DEPENDS_ON relationships
@@ -305,6 +348,7 @@ src/
   - Confidence scoring
 
 #### 4. Relationship Agent Implementation
+
 - [ ] Implement RelationshipAgent class
 - [ ] Add graph update queue
 - [ ] Implement incremental updates
@@ -316,12 +360,14 @@ src/
   - Impact analysis
 
 #### 5. Graph Maintenance
+
 - [ ] Implement scheduled updates
 - [ ] Add on-demand refresh
 - [ ] Create orphan node cleanup
 - [ ] Add graph statistics tracking
 
 ### Deliverables
+
 - ✅ Relationship Agent with full graph management
 - ✅ Neo4j integration with all node/relationship types
 - ✅ Dependency discovery (direct, indirect, API)
@@ -329,6 +375,7 @@ src/
 - ✅ Integration tests
 
 ### Success Criteria
+
 - Graph accurately represents repository relationships
 - Can discover transitive dependencies up to 5 levels deep
 - API consumption detection has >70% accuracy
@@ -338,12 +385,14 @@ src/
 ---
 
 ## Phase 5: Backend API & WebSocket
+
 **Duration**: 2 weeks  
 **Goal**: Create REST API and WebSocket server for frontend communication
 
 ### Tasks
 
 #### 1. API Framework Setup
+
 - [ ] Set up Express.js
 - [ ] Configure middleware (CORS, body parsing, logging)
 - [ ] Set up routing structure
@@ -351,6 +400,7 @@ src/
 - [ ] Implement error handling
 
 #### 2. REST API Endpoints
+
 - [ ] User management
   - POST /api/users (create/get user by username)
   - GET /api/users/:id
@@ -372,6 +422,7 @@ src/
   - POST /api/graph/query (execute custom graph query)
 
 #### 3. WebSocket Server
+
 - [ ] Set up Socket.IO
 - [ ] Implement connection handling
 - [ ] Create room management (per conversation thread)
@@ -386,18 +437,21 @@ src/
   - `error`
 
 #### 4. Integration with Agents
+
 - [ ] Connect Developer Agent to WebSocket
 - [ ] Stream agent messages to frontend
 - [ ] Broadcast status updates
 - [ ] Send progress notifications
 
 ### Deliverables
+
 - ✅ REST API with all endpoints
 - ✅ WebSocket server with real-time events
 - ✅ API documentation (OpenAPI/Swagger)
 - ✅ Integration tests for API endpoints
 
 ### Success Criteria
+
 - All API endpoints functional and documented
 - WebSocket successfully broadcasts agent activity
 - API response times <200ms for simple queries
@@ -407,12 +461,14 @@ src/
 ---
 
 ## Phase 6: React Frontend
+
 **Duration**: 3-4 weeks  
 **Goal**: Build user interface with chatbot and visualizations
 
 ### Tasks
 
 #### 1. Frontend Framework Setup
+
 - [ ] Initialize React with Vite
 - [ ] Set up TypeScript
 - [ ] Configure Tailwind CSS (or preferred CSS framework)
@@ -421,6 +477,7 @@ src/
 - [ ] Set up Socket.IO client
 
 #### 2. Core Components
+
 - [ ] Layout
   - Header
   - Sidebar (conversation threads)
@@ -436,6 +493,7 @@ src/
   - Delete thread
 
 #### 3. Chatbot Interface
+
 - [ ] Message List
   - User messages
   - Assistant messages
@@ -452,6 +510,7 @@ src/
   - Animated loading state
 
 #### 4. Agent Activity Panel
+
 - [ ] Active Agents Display
   - List of spawned agents
   - Agent type and ID
@@ -466,6 +525,7 @@ src/
   - Task completion status
 
 #### 5. Agent Communication Viewer
+
 - [ ] Message Flow Visualization
   - Timeline view of agent messages
   - Color-coded by agent type
@@ -476,6 +536,7 @@ src/
   - D3.js or similar library
 
 #### 6. Knowledge Graph Visualization
+
 - [ ] Graph Viewer Component
   - Use react-force-graph or vis.js
   - Node types (repositories, packages, APIs)
@@ -490,6 +551,7 @@ src/
   - Export graph image
 
 #### 7. Repository Details
+
 - [ ] Repository Info Panel
   - Name, owner, description
   - Detected type
@@ -498,6 +560,7 @@ src/
   - Recent analysis results
 
 #### 8. State Management
+
 - [ ] Set up React Context or Zustand
 - [ ] Manage user state
 - [ ] Manage conversation state
@@ -505,6 +568,7 @@ src/
 - [ ] Manage agent activity state
 
 #### 9. Real-Time Updates
+
 - [ ] Connect to WebSocket
 - [ ] Handle agent events
 - [ ] Update UI in real-time
@@ -512,6 +576,7 @@ src/
 - [ ] Handle reconnection
 
 ### Deliverables
+
 - ✅ Fully functional React frontend
 - ✅ Chatbot interface with message history
 - ✅ Agent activity monitoring panel
@@ -520,6 +585,7 @@ src/
 - ✅ Component tests
 
 ### Success Criteria
+
 - Users can chat and receive responses
 - Agent activity visible in real-time
 - Knowledge graph renders smoothly (>30 FPS)
@@ -530,12 +596,14 @@ src/
 ---
 
 ## Phase 7: Integration & End-to-End Testing
+
 **Duration**: 1-2 weeks  
 **Goal**: Integrate all components and ensure system works end-to-end
 
 ### Tasks
 
 #### 1. System Integration
+
 - [ ] Connect all agents to Developer Agent
 - [ ] Verify agent communication flows
 - [ ] Test agent spawning and lifecycle
@@ -543,6 +611,7 @@ src/
 - [ ] Test checkpoint recovery
 
 #### 2. End-to-End Scenarios
+
 - [ ] Scenario 1: Simple repository query
   - User asks about a repository
   - GitHub Agent fetches metadata
@@ -566,6 +635,7 @@ src/
   - Results presented with confidence scores
 
 #### 3. Performance Testing
+
 - [ ] Load testing
   - Multiple concurrent users
   - Multiple concurrent queries
@@ -580,6 +650,7 @@ src/
   - WebSocket message throughput
 
 #### 4. Error Handling
+
 - [ ] Test error scenarios
   - Invalid repository
   - Rate limit exceeded
@@ -592,6 +663,7 @@ src/
   - Graceful degradation
 
 #### 5. User Acceptance Testing
+
 - [ ] Create test scenarios
 - [ ] Recruit test users
 - [ ] Gather feedback
@@ -599,6 +671,7 @@ src/
 - [ ] Iterate on improvements
 
 ### Deliverables
+
 - ✅ Fully integrated system
 - ✅ End-to-end test suite
 - ✅ Performance test results
@@ -606,6 +679,7 @@ src/
 - ✅ UAT feedback incorporated
 
 ### Success Criteria
+
 - All end-to-end scenarios pass
 - System handles 10 concurrent users
 - Query response time <30 seconds for complex queries
@@ -616,12 +690,14 @@ src/
 ---
 
 ## Phase 8: Documentation & Deployment
+
 **Duration**: 1 week  
 **Goal**: Create comprehensive documentation and deploy system
 
 ### Tasks
 
 #### 1. Code Documentation
+
 - [ ] Add JSDoc comments to all public APIs
 - [ ] Document complex algorithms
 - [ ] Create architecture diagrams
@@ -629,6 +705,7 @@ src/
 - [ ] Document agent communication protocols (already done)
 
 #### 2. User Documentation
+
 - [ ] Write user guide
   - Getting started
   - Basic usage
@@ -638,6 +715,7 @@ src/
 - [ ] Write FAQ
 
 #### 3. Developer Documentation
+
 - [ ] Write contribution guide
 - [ ] Document development setup
 - [ ] Explain testing strategy
@@ -645,6 +723,7 @@ src/
 - [ ] Create development roadmap
 
 #### 4. Deployment
+
 - [ ] Create production Docker Compose
 - [ ] Set up environment variables for production
 - [ ] Configure logging and monitoring
@@ -654,6 +733,7 @@ src/
 - [ ] Deploy to production
 
 #### 5. Monitoring & Alerting
+
 - [ ] Set up application monitoring
 - [ ] Configure error tracking (e.g., Sentry)
 - [ ] Set up log aggregation
@@ -661,12 +741,14 @@ src/
 - [ ] Create dashboard
 
 ### Deliverables
+
 - ✅ Complete documentation (code, user, developer)
 - ✅ Deployed system (staging + production)
 - ✅ Monitoring and alerting configured
 - ✅ Backup and recovery procedures documented
 
 ### Success Criteria
+
 - Documentation is clear and comprehensive
 - System successfully deployed and accessible
 - Monitoring captures all critical metrics
@@ -678,6 +760,7 @@ src/
 ## Post-Launch: Maintenance & Enhancements
 
 ### Short-term (1-3 months)
+
 - [ ] Monitor system performance
 - [ ] Fix bugs reported by users
 - [ ] Optimize slow queries
@@ -685,6 +768,7 @@ src/
 - [ ] Add missing features requested by users
 
 ### Medium-term (3-6 months)
+
 - [ ] Add support for more repository types
 - [ ] Enhance API consumption detection
 - [ ] Improve knowledge graph algorithms
@@ -692,6 +776,7 @@ src/
 - [ ] Mobile-responsive improvements
 
 ### Long-term (6-12 months)
+
 - [ ] Add support for private repositories
 - [ ] Integrate additional LLM providers
 - [ ] Add code modification capabilities (with approval)
@@ -704,28 +789,29 @@ src/
 
 ### Technical Risks
 
-| Risk | Impact | Probability | Mitigation |
-|------|--------|-------------|------------|
-| LangGraph learning curve | High | Medium | Allocate extra time for Phase 1, consult documentation |
-| GitHub rate limits | Medium | High | Implement aggressive caching, request throttling |
-| Neo4j performance at scale | Medium | Medium | Optimize queries, add appropriate indexes |
-| OpenAI API costs | High | Medium | Monitor usage, implement caching for embeddings |
-| Agent coordination complexity | High | Medium | Start simple, iterate, extensive testing |
+| Risk                          | Impact | Probability | Mitigation                                             |
+| ----------------------------- | ------ | ----------- | ------------------------------------------------------ |
+| LangGraph learning curve      | High   | Medium      | Allocate extra time for Phase 1, consult documentation |
+| GitHub rate limits            | Medium | High        | Implement aggressive caching, request throttling       |
+| Neo4j performance at scale    | Medium | Medium      | Optimize queries, add appropriate indexes              |
+| OpenAI API costs              | High   | Medium      | Monitor usage, implement caching for embeddings        |
+| Agent coordination complexity | High   | Medium      | Start simple, iterate, extensive testing               |
 
 ### Project Risks
 
-| Risk | Impact | Probability | Mitigation |
-|------|--------|-------------|------------|
-| Scope creep | High | High | Strict phase boundaries, defer non-critical features |
-| Timeline delays | Medium | Medium | Build buffer time, prioritize MVP features |
-| Resource availability | Medium | Low | Document everything, enable collaboration |
-| Third-party dependencies | Medium | Low | Pin dependency versions, have fallback options |
+| Risk                     | Impact | Probability | Mitigation                                           |
+| ------------------------ | ------ | ----------- | ---------------------------------------------------- |
+| Scope creep              | High   | High        | Strict phase boundaries, defer non-critical features |
+| Timeline delays          | Medium | Medium      | Build buffer time, prioritize MVP features           |
+| Resource availability    | Medium | Low         | Document everything, enable collaboration            |
+| Third-party dependencies | Medium | Low         | Pin dependency versions, have fallback options       |
 
 ---
 
 ## Success Metrics
 
 ### Technical Metrics
+
 - **System Uptime**: >99.5%
 - **Query Response Time**: <30s for complex queries, <5s for simple queries
 - **Agent Accuracy**: >80% relevance for repository analysis
@@ -733,6 +819,7 @@ src/
 - **Test Coverage**: >80% for critical paths
 
 ### User Metrics
+
 - **User Satisfaction**: >4/5 rating
 - **Task Completion Rate**: >90%
 - **Error Rate**: <5% of queries result in errors
@@ -740,6 +827,7 @@ src/
 - **Feedback**: Positive qualitative feedback
 
 ### Business Metrics
+
 - **Demonstration Value**: Successfully demonstrates A2A capabilities
 - **Knowledge Sharing**: Documentation enables others to understand and extend
 - **Reusability**: Components can be reused in other projects
@@ -747,4 +835,14 @@ src/
 
 ---
 
-*Last Updated: October 22, 2025*
+## Progress Update (October 27, 2025)
+
+- ✅ Phase 0: Infrastructure setup complete (databases, environment, scripts, API server)
+- ✅ Agent base classes scaffolded for Developer, GitHub, Relationship, and all Repository agents
+- ✅ Shared types/interfaces implemented (`IAgent`, `AgentRequest`, `AgentResponse`)
+- ✅ Initial agent class implementations created
+- ✅ Lint and type safety improvements applied
+- ✅ Agent registry and orchestration logic started in DeveloperAgent
+- ⏭️ Next: Implement agent-to-agent communication, logging/observability, and unit/integration tests
+
+_Last Updated: October 22, 2025_

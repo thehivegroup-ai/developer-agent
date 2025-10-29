@@ -1,0 +1,50 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["ES2022"],
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "checkJs": false,
+    "outDir": "./dist",
+    "rootDir": "./",
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+
+    "paths": {
+      "@backend/*": ["./packages/backend/src/*"],
+      "@frontend/*": ["./packages/frontend/src/*"],
+      "@shared/*": ["./packages/shared/src/*"]
+    }
+  },
+  "include": [
+    "packages/*/src/**/*",
+    "developer-agent/**/*",
+    "github-agent/**/*",
+    "relationship-agent/**/*",
+    "repository-agent-csharp-api/**/*",
+    "repository-agent-csharp-library/**/*",
+    "repository-agent-node-api/**/*",
+    "repository-agent-react/**/*",
+    "repository-agent-angular/**/*",
+    "agents-shared/**/*"
+  ],
+  "exclude": ["node_modules", "dist", "build"]
+}

@@ -1,108 +1,179 @@
-# A2A Multi-Agent System Documentation
+# A2A Multi-Agent System
 
-## Overview
-This system demonstrates Agent-to-Agent (A2A) communication using LangGraph, enabling multiple specialized agents to collaborate in analyzing GitHub repositories and building a knowledge graph of their relationships.
+A multi-agent system demonstrating Agent-to-Agent (A2A) communication using LangGraph, enabling multiple specialized agents to collaborate in analyzing GitHub repositories and building a knowledge graph of their relationships.
 
-## System Architecture
+## Prerequisites
 
-### Core Components
-1. **Developer Agent** - Central coordinator
-2. **GitHub Agent** - Repository discovery
-3. **Repository Agents** - Specialized code analysis (5 types)
-4. **Relationship Agent** - Knowledge graph builder
-5. **React Web UI** - User interface with chatbot
-6. **PostgreSQL** - Conversations, embeddings, cache
-7. **Neo4j** - Knowledge graph storage
+- Node.js >= 22.0.0
+- npm >= 10.0.0
+- PostgreSQL with pgvector extension (configured on dh02)
+- Neo4j (via Docker)
+- OpenAI API key
+- GitHub token (optional, for higher rate limits)
 
-### Technology Stack
-- **Framework**: LangGraph
-- **Runtime**: TypeScript/Node.js
-- **Frontend**: React
+## Quick Start
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/thehivegroup-ai/developer-agent.git
+cd developer-agent
+```
+
+### 2. Install Dependencies
+
+```bash
+npm install
+```
+
+### 3. Configure Environment
+
+Copy the template and fill in your configuration:
+
+```bash
+cp .env.template .env.local
+```
+
+Edit `.env.local` with your settings:
+
+- PostgreSQL connection (already on dh02)
+- Neo4j credentials
+- OpenAI API key
+- GitHub token (optional)
+
+### 4. Start Neo4j
+
+```bash
+docker-compose up -d
+```
+
+### 5. Setup Databases
+
+```bash
+npm run db:setup
+npm run db:seed
+```
+
+### 6. Start Development Server
+
+```bash
+npm run dev
+```
+
+The API will be available at http://localhost:3000
+
+## Project Structure
+
+```
+developer-agent/
+├── packages/
+│   ├── backend/          # API and agent orchestration
+│   │   └── src/
+│   │       ├── agents/   # Agent implementations (Phase 1+)
+│   │       ├── config/   # Configuration management
+│   │       ├── database/ # Database clients and scripts
+│   │       └── index.ts  # Application entry point
+│   ├── frontend/         # React UI (Phase 6)
+│   └── shared/           # Shared types and utilities
+│       └── src/
+│           ├── types.ts  # TypeScript interfaces
+│           ├── config.ts # Configuration schemas
+│           └── errors.ts # Error classes
+├── config/
+│   └── repositories.json # Repository configuration
+├── .documentation/       # Long-lived documentation
+├── .memory-bank/        # Planning documents
+└── docker-compose.yml   # Neo4j setup
+```
+
+## Available Scripts
+
+### Root Level
+
+- `npm run dev` - Start all packages in development mode
+- `npm run build` - Build all packages
+- `npm run test` - Run all tests
+- `npm run lint` - Lint all packages
+- `npm run format` - Format code with Prettier
+
+### Database Management
+
+- `npm run db:setup` - Initialize database schemas
+- `npm run db:seed` - Populate with test data
+- `npm run db:reset` - Drop all tables and start fresh
+
+## Technology Stack
+
+- **Framework**: LangGraph.js
+- **Runtime**: Node.js 22+ / TypeScript
+- **API**: Fastify
+- **Frontend**: React + Vite (coming in Phase 6)
+- **Databases**:
+  - PostgreSQL with pgvector (conversations, embeddings, cache)
+  - Neo4j (knowledge graph)
 - **LLM**: OpenAI (GPT-4 + Embeddings)
-- **Databases**: PostgreSQL (pgvector), Neo4j
-- **Architecture**: Monorepo
 
-## Agent Capabilities
+## Development Phases
 
-### Developer Agent
-Central orchestrator that coordinates all agent activities, decomposes complex queries, monitors agent communication, and synthesizes results.
+This project is being built in phases:
 
-### GitHub Agent
-Discovers and analyzes GitHub repositories, detects repository types, manages rate limiting, and provides metadata to other agents.
+- **Phase 0** (Current): Infrastructure Setup ✅
+  - Project structure
+  - Database setup
+  - Configuration
+  - Basic API skeleton
 
-### Repository Agents
-Five specialized agent types (C# API, C# Library, Node API, React, Angular) that perform semantic search over codebases, generate embeddings, and provide code analysis.
+- **Phase 1** (Next): Core Agent Framework
+  - Base agent implementation
+  - LangGraph integration
+  - Message system
+  - Developer Agent MVP
 
-### Relationship Agent
-Builds and maintains a knowledge graph in Neo4j, tracking dependencies (direct, indirect, API consumption) and supporting incremental updates.
-
-## Key Features
-
-### Multi-User Support
-- Simple username-based identification
-- Separate conversation histories per user
-- Multiple conversation threads per user
-
-### Real-Time Communication
-- WebSocket-based real-time updates
-- Visible agent-to-agent communication
-- Progress indicators for long operations
-
-### Knowledge Graph
-- Interactive visualization
-- Automatic relationship discovery
-- Persistent between sessions
-- Incremental updates
-
-### Semantic Search
-- OpenAI embeddings
-- pgvector storage
-- Index-on-first-access strategy
-
-## Data Flow
-
-1. User submits query via chatbot
-2. Developer Agent receives and decomposes query
-3. GitHub Agent discovers relevant repositories
-4. Repository Agents spawn on-demand and analyze code
-5. Relationship Agent updates knowledge graph
-6. Results synthesized and presented to user
-7. Agent communication visible in UI
+- **Phase 2-7**: See `.memory-bank/planning/development-phases.md`
 
 ## Configuration
 
-### Environment Variables (.env.local)
-- PostgreSQL connection
-- Neo4j connection
-- OpenAI API key
-- GitHub token (optional)
-- Repository config path
-- Agent TTL settings
+### Repositories
 
-### Repository Configuration (repositories.json)
-JSON file listing public repositories to monitor and analyze.
+Edit `config/repositories.json` to configure which repositories to analyze:
 
-## Design Principles
+```json
+{
+  "repositories": [
+    {
+      "owner": "cortside",
+      "name": "coeus",
+      "enabled": true
+    }
+  ]
+}
+```
 
-1. **Modularity**: Each agent is independent and specialized
-2. **Observability**: All agent communication is visible and logged
-3. **Resilience**: Checkpointing and resumable operations
-4. **Scalability**: On-demand agent spawning with caching
-5. **User-Centric**: Clear visualization of system state
+### Environment Variables
 
-## Documentation Structure
+See `.env.template` for all available configuration options.
 
-This `.documentation/` folder contains long-lived architectural and design documentation that evolves with the project.
+## Testing
 
-The `.memory-bank/` folder contains short-term planning documents that are completed and then archived.
+```bash
+npm test
+```
 
----
+## Documentation
 
-*Last Updated: October 22, 2025*
+- [Architecture Overview](.documentation/README.md)
+- [Development Plan](.memory-bank/planning/development-phases.md)
+- [Database Schemas](.memory-bank/planning/database-schemas.md)
+- [API Contracts](.memory-bank/planning/api-contracts.md)
 
+## Contributing
 
-## Memory
+This project follows a bottom-up development approach, building core components first and then integrating them.
 
-https://langchain-ai.github.io/langgraphjs/concepts/memory/#editing-message-lists
+## License
 
-https://levelup.gitconnected.com/building-long-term-memory-in-agentic-ai-2941b0cca3bf
+MIT
+
+## Support
+
+For issues and questions, please open an issue on GitHub.
