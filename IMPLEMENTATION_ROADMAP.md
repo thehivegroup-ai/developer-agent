@@ -2,9 +2,9 @@
 
 Based on the documented features in `docs/README.md`, here's what needs to be built to complete the system.
 
-## Current Status: ~65% Complete (MVP Phase 1 COMPLETE + CLI COMPLETE!)
+## Current Status: ~75% Complete (MVP Phase 1 COMPLETE + CLI COMPLETE + Semantic Search + Neo4j Relationships!)
 
-### ✅ What's Done (Phase 1 Complete - All MVP Tasks)
+### ✅ What's Done (Phase 1 Complete - All MVP Tasks + Major Features)
 
 - PostgreSQL and Neo4j setup
 - BaseAgent infrastructure
@@ -15,27 +15,33 @@ Based on the documented features in `docs/README.md`, here's what needs to be bu
 - Logging system
 - Basic Fastify server with CORS
 - **REST API Endpoints** (POST /api/query, GET /api/query/:id, GET /api/query/:id/result)
-- **GitHub Agent** (Full implementation with Octokit, rate limiting, caching, repository type detection)
+- **GitHub Agent** (Full implementation with Octokit, rate limiting, caching, repository type detection for 6+ types)
 - **Metadata-Based Repository Analysis** (Repository embeddings from GitHub metadata, no cloning required)
 - **Config-Based Repository Loading** (Analyzes repos from config/repositories.json, not GitHub search)
 - **OpenAI Embeddings Integration** (text-embedding-3-small model via API)
 - **Database Schema** (pgvector extension, repository_embeddings table, migration system, semantic search)
 - **Agent Integration** (DeveloperAgent coordinateAgents() with dynamic spawning, task orchestration, result persistence)
-- **LangGraph Workflow System** (Query decomposition, GitHub discovery, repository analysis, finalization nodes)
+- **LangGraph Workflow System** (Query decomposition, GitHub discovery, repository analysis, relationship analysis, finalization nodes)
 - **Conditional Routing** (State-based workflow routing logic)
 - **CheckpointManager** (Full PostgreSQL persistence with thread/user auto-creation)
 - **CLI Interface** (npm run query -- "analyze repositories" with formatted output)
+- **Semantic Search CLI** (npm run search -- "query text" with vector similarity)
+- **Multi-Language Support** (Python, JavaScript, TypeScript, C#, PowerShell)
+- **Relationship Agent** (Neo4j graph database for dependency tracking)
+- **Dependency Extraction** (npm and NuGet package parsing from package.json and .csproj files)
+- **Repository Relationship Tracking** (Distinguishes between external packages and internal repository dependencies)
+- **Relationships CLI** (npm run relationships -- "repo-name" to explore dependency graph)
 - All TypeScript compilation errors resolved
 - Build system working across all services
 - End-to-end integration tests passing
 - Workflow execution tests passing
 - Config-based repository test passing
 
-### ❌ What's Missing (~35% of documented features)
+### ❌ What's Missing (~25% of documented features)
 
 ---
 
-## Priority 1: Make It Work (MVP) - IN PROGRESS
+## Priority 1: Make It Work (MVP) - COMPLETE ✅
 
 _Goal: Get one end-to-end flow working_
 
@@ -64,13 +70,14 @@ Full implementation complete:
 - Repository metadata extraction ✅
 - Integration with message system ✅
 
-### ✅ 1.3 Node.js Repository Agent (COMPLETE - EVOLVED)
+### ✅ 1.3 Repository Analysis (COMPLETE - EVOLVED)
 
 **Files:**
 
-- `repository-agents/src/NodeApiAgent.ts` (basic implementation exists)
-- `shared/src/database/embeddings.ts` (NEW - metadata-based approach)
-- `shared/src/workflows/agent-workflow.ts` (repositoryAnalysisNode)
+- `repository-agents/src/NodeApiAgent.ts` (dependency extraction)
+- `shared/src/database/embeddings.ts` (metadata-based embeddings)
+- `shared/src/database/dependency-extractor.ts` (npm and NuGet parsing)
+- `shared/src/workflows/agent-workflow.ts` (repositoryAnalysisNode + relationshipAnalysisNode)
 
 **Implementation evolved to metadata-based approach:**
 
@@ -78,10 +85,12 @@ Full implementation complete:
 - No repository cloning required ✅
 - Uses OpenAI text-embedding-3-small API ✅
 - Stores embeddings in repository_embeddings table ✅
-- Filters repositories by language (JavaScript/TypeScript) ✅
+- **Supports ALL languages** (Python, C#, TypeScript, JavaScript, PowerShell) ✅
 - Metadata includes: description, language, topics, size, type ✅
+- **Dependency extraction** from package.json and .csproj files ✅
+- **13 repositories analyzed** with 86 dependencies tracked ✅
 
-**Note:** Original NodeApiAgent with full code analysis exists but is not used in current workflow. The metadata approach is simpler, faster, and sufficient for semantic repository search.
+**Note:** Metadata approach is simpler, faster, and sufficient for semantic repository search.
 
 ### ✅ 1.4 Database Schema Setup (COMPLETE)
 
@@ -148,106 +157,228 @@ Agent coordination complete:
 
 **Milestone:** ✅ MVP Phase 1 Complete! End-to-end flow working with declarative, state-based workflow execution.
 
+### ✅ 1.5 Semantic Search (COMPLETE!)
+
+**Files:**
+
+- `shared/src/database/embeddings.ts` (searchSimilarRepositories function)
+- `developer-agent/src/search.ts` (CLI interface)
+
+**Features:**
+
+- Vector similarity search using pgvector ✅
+- OpenAI embedding generation for queries ✅
+- Cosine distance ranking ✅
+- Fast performance (~0.3-1.4 seconds) ✅
+- CLI: `npm run search -- "REST API"` ✅
+- Configurable result limits ✅
+
+**Results:**
+
+- Searches 13+ repositories with embeddings
+- Returns ranked results with similarity scores
+- Shows metadata: language, type, description, size
+
+### ✅ 1.6 Relationship Agent & Neo4j Graph (COMPLETE!)
+
+**Files:**
+
+- `relationship-agent/src/index.ts` (full implementation)
+- `shared/src/database/neo4j-relationships.ts` (graph operations)
+- `shared/src/database/dependency-extractor.ts` (npm & NuGet parsing)
+- `developer-agent/src/relationships.ts` (CLI interface)
+
+**Features:**
+
+- Neo4j graph database integration ✅
+- Dependency extraction from package.json (npm) ✅
+- Dependency extraction from .csproj files (NuGet) ✅
+- Recursive file searching (src/, Source/ directories) ✅
+- Distinguish repository vs package dependencies ✅
+- DEPENDS_ON relationships for external packages ✅
+- DEPENDS_ON_REPO relationships for internal repos ✅
+- SIMILAR_TO relationships based on shared dependencies ✅
+- CLI: `npm run relationships -- "repo-name"` ✅
+
+**Results:**
+
+- 86 dependencies tracked across 13 repositories
+- Internal repository dependency graph
+- Finds what repos depend on each other
+- Shows related repositories by shared dependencies
+
 ---
 
 ## 🎯 WHERE WE ARE NOW (October 31, 2025)
 
-**Status:** MVP Phase 1 is COMPLETE! ✅ + CLI Added! ✅
+**Status:** MVP Phase 1 is COMPLETE! ✅ + Semantic Search ✅ + Neo4j Relationships ✅
 
 The system can now:
 
 1. ✅ Accept queries via `processQueryWithWorkflow()`
 2. ✅ Decompose queries into tasks
-3. ✅ **Analyze repositories from config/repositories.json** (not random GitHub search!)
-4. ✅ Filter repositories by language (JS/TS for embeddings)
+3. ✅ **Analyze repositories from config/repositories.json** (13 repos configured)
+4. ✅ **Support ALL languages** (Python, C#, TypeScript, JavaScript, PowerShell)
 5. ✅ Generate embeddings from repository metadata (no cloning needed)
 6. ✅ Store embeddings in PostgreSQL with pgvector
-7. ✅ Return structured results
-8. ✅ **CLI Interface** - `npm run query -- "analyze repositories"`
-9. ✅ Database checkpoint persistence
-10. ✅ Tests pass with ~6 second execution time
+7. ✅ **Semantic search** across repositories with vector similarity
+8. ✅ **Extract dependencies** from package.json and .csproj files
+9. ✅ **Track relationships** in Neo4j graph database
+10. ✅ **Differentiate** between package and repository dependencies
+11. ✅ Return structured results
+12. ✅ **3 CLI Commands:**
+    - `npm run query -- "analyze repositories"` - Analyze & embed repos
+    - `npm run search -- "REST API"` - Semantic search
+    - `npm run relationships -- "repo-name"` - Explore dependency graph
+13. ✅ Database checkpoint persistence
+14. ✅ End-to-end tests passing
+
+**Metrics:**
+
+- **13 repositories** analyzed (Python, TypeScript, C#, PowerShell)
+- **86 dependencies** tracked in Neo4j
+- **13+ embeddings** stored in PostgreSQL
+- **Repository relationships** mapped (internal dependencies)
+- **Semantic search** in ~0.3-1.4 seconds
+- **Full analysis** in ~20-25 seconds
 
 **Key Changes Since Plan:**
 
-- ✅ **Config-Based Repositories**: System now analyzes ONLY the repositories configured in `config/repositories.json` instead of doing GitHub searches
-- ✅ **CLI Complete**: Full working CLI with help, error handling, and formatted output
-- ✅ **Metadata-Based Embeddings**: Fast, simple approach without repository cloning
-- ✅ **Working End-to-End**: Can analyze 5 configured repos (Python, TypeScript, C# libraries) in ~6 seconds
+- ✅ **Config-Based Repositories**: Analyzes repos from `config/repositories.json`
+- ✅ **CLI Complete**: 3 working commands for all operations
+- ✅ **Metadata-Based Embeddings**: Fast approach without cloning
+- ✅ **Multi-Language Support**: Not just JS/TS - now Python, C#, PowerShell too
+- ✅ **Semantic Search**: Vector similarity search working
+- ✅ **Neo4j Integration**: Full dependency graph tracking
+- ✅ **Smart Dependency Detection**: Distinguishes internal vs external deps
 
 ---
 
-## 🚀 WHAT'S NEXT - Priority 2: Make It Usable (UI)
+## 🚀 WHAT'S NEXT - Priority 2: Make It Usable
 
-### ✅ Step 1: CLI Interface (COMPLETE!)
+Current options for next development phase:## 🚀 WHAT'S NEXT - Priority 2: Make It Better
 
-**Status:** ✅ DONE
+### 🎯 NEXT UP: Monorepo Support (1-2 days) 📦
 
-**File:** `developer-agent/src/cli.ts` (211 lines)
+**Why:** Many real-world repositories are monorepos with multiple services/projects
 
-The CLI is fully working:
+**Problem:**
+Currently, the system treats each repository as a single entity. Monorepos contain multiple services, each with their own dependencies, but we analyze only the root.
 
-```bash
-npm run query -- "analyze repositories"
-npm run query -- --help
-```
+**Solution:**
+Extend `config/repositories.json` to support service paths within repositories.
 
-**Features:**
+**What to build:**
 
-- ✅ Command-line argument parsing
-- ✅ Help documentation
-- ✅ Database connection with graceful fallback
-- ✅ Formatted output showing all analyzed repos
-- ✅ Error handling and cleanup
-- ✅ Progress indicators
+1. **Extended Config Schema** (`config/repositories.json`)
 
-**Test Results:**
+   ```json
+   {
+     "repositories": [
+       {
+         "owner": "cortside",
+         "name": "monorepo-example",
+         "enabled": true,
+         "services": [
+           {
+             "name": "api-service",
+             "path": "services/api",
+             "type": "csharp-api"
+           },
+           {
+             "name": "worker-service",
+             "path": "services/worker",
+             "type": "node-api"
+           }
+         ]
+       }
+     ]
+   }
+   ```
 
-- Analyzes 5 configured repositories
-- Generates embeddings for TypeScript repos
-- Completes in ~6 seconds
-- Saves checkpoints to database
+2. **Updated GitHub Agent** (`github-agent/src/index.ts`)
+   - Analyze each service path separately
+   - Detect type per service (might be different languages)
+   - Return array of service metadata
 
----
+3. **Updated Dependency Extraction** (`shared/src/database/dependency-extractor.ts`)
+   - Accept optional `path` parameter
+   - Search for package.json/.csproj at specified path
+   - Extract dependencies per service
 
-### 🔲 Step 2: Simple Web UI (NEXT - 3-4 days)
+4. **Updated Workflow** (`shared/src/workflows/agent-workflow.ts`)
+   - Loop through services if defined
+   - Create separate embeddings per service
+   - Store service path in metadata
+   - Create separate Neo4j nodes per service
 
-Now that CLI works, next logical step is a simple web interface.
+5. **Updated Neo4j Schema** (`shared/src/database/neo4j-relationships.ts`)
+   - Add `servicePath` and `serviceName` to Repository nodes
+   - Support services as first-class entities
+   - Track inter-service dependencies within same repo
 
-Keep REST API working and add minimal web interface:
-
-**Files:**
-
-- `frontend/src/` - Minimal React app
-- `api-gateway/src/routes/query.ts` - Already exists
+6. **Updated CLIs**
+   - Search: Show service path in results
+   - Relationships: Group by repository, show services
 
 **Benefits:**
 
-- More polished demo experience
+- ✅ Analyze monorepos with multiple services
+- ✅ Track dependencies per service
+- ✅ Understand inter-service relationships
+- ✅ More accurate dependency graphs
+- ✅ Better semantic search (service-level granularity)
+
+**Example Use Cases:**
+
+- Microservices monorepo with 10+ services
+- Full-stack repo (frontend/ + backend/ + shared/)
+- Multi-project C# solution
+- Turborepo with multiple packages
+
+**Time Estimate:** 1-2 days
+
+---
+
+### Option A: REST API Enhancement (2-3 days) 🔌
+
+**Why:** Makes current features accessible via HTTP API
+
+**What to build:**
+
+- `POST /api/search` - Semantic search endpoint
+- `GET /api/repositories` - List all analyzed repos
+- `GET /api/repositories/:owner/:name` - Get repo details & dependencies
+- `GET /api/relationships/:owner/:name` - Get dependency graph
+- `POST /api/repositories/analyze` - Trigger analysis
+
+**Benefits:**
+
+- Enables external integrations
+- Foundation for web UI
+- Makes CLI features available via HTTP
+
+---
+
+### Option B: Simple Web UI (3-4 days) 🌐
+
+**Why:** Better user experience than CLI
+
+**What to build:**
+
+- Minimal React frontend
+- Repository search interface
+- Dependency graph visualization
+- Analysis results display
+- Uses existing REST API
+
+**Benefits:**
+
+- More polished demo
 - Easier for non-technical users
-- Can show agent activity visually
-- Foundation for full UI later
-
-### Option C: Full Real-Time UI (Ambitious - 7-10 days)
-
-Build complete chatbot interface with WebSockets:
-
-**Files:**
-
-- `frontend/src/components/` - Full chat UI
-- `api-gateway/src/websocket/` - Socket.IO server
-
-**Benefits:**
-
-- Production-quality user experience
-- Real-time agent activity updates
-- Conversation history
-- Professional demo
+- Visual dependency graphs
 
 ---
-
-## Priority 2: Make It Usable (UI) - DETAILED PLANS
-
-## Priority 2: Make It Usable (UI) - DETAILED PLANS
 
 ### 🔲 1.7 Simple CLI Interface (1 day)
 
@@ -522,13 +653,98 @@ Production deployment:
 
 ## Time Estimates
 
-| Priority                         | Description               | Time Estimate                |
-| -------------------------------- | ------------------------- | ---------------------------- |
-| **P1: Make It Work**             | MVP with one working flow | 8-12 days                    |
-| **P2: Make It Usable**           | UI and real-time features | 8-10 days                    |
-| **P3: Make It Complete**         | All documented features   | 20-26 days                   |
-| **P4: Make It Production-Ready** | Polish and deployment     | 12-16 days                   |
-| **TOTAL**                        | Full implementation       | **48-64 days** (~2-3 months) |
+| Priority                         | Description               | Original Estimate | Actual Status    |
+| -------------------------------- | ------------------------- | ----------------- | ---------------- |
+| **P1: Make It Work**             | MVP with one working flow | 8-12 days         | ✅ COMPLETE      |
+| **Semantic Search**              | Vector similarity search  | Not planned       | ✅ COMPLETE (1d) |
+| **Neo4j Relationships**          | Dependency graph tracking | 3-4 days          | ✅ COMPLETE (1d) |
+| **P2: Make It Usable**           | UI and real-time features | 8-10 days         | 🔲 Not started   |
+| **P3: Make It Complete**         | All documented features   | 20-26 days        | 🔲 Not started   |
+| **P4: Make It Production-Ready** | Polish and deployment     | 12-16 days        | 🔲 Not started   |
+| **COMPLETED SO FAR**             | MVP + Search + Graph      | ~10 days          | **~75% done**    |
+
+---
+
+## 📊 Session Summary (October 31, 2025)
+
+### What We Accomplished Today:
+
+**1. Semantic Search Implementation (1-2 hours)**
+
+- ✅ Created `searchSimilarRepositories()` function with vector similarity
+- ✅ Built search CLI (`npm run search -- "query"`)
+- ✅ Added to package.json scripts
+- ✅ Tested with multiple queries (REST API, health monitoring, authorization)
+- ✅ Fast performance: 0.3-1.4 seconds per search
+- ✅ 13+ repositories searchable
+
+**2. Relationship Agent & Neo4j Integration (3-4 hours)**
+
+- ✅ Created Neo4j utilities and schema initialization
+- ✅ Implemented dependency extraction for npm (package.json)
+- ✅ Implemented dependency extraction for NuGet (.csproj with recursive search)
+- ✅ Built RelationshipAgent with graph storage
+- ✅ Added relationshipAnalysisNode to workflow
+- ✅ Created relationships CLI (`npm run relationships -- "repo"`)
+- ✅ **Smart dependency detection**: Distinguishes between:
+  - External packages (NuGet, npm)
+  - Internal repository dependencies (DEPENDS_ON_REPO relationships)
+- ✅ Fixed all bugs:
+  - LIMIT integer conversion for Neo4j
+  - Show ALL dependencies (removed pagination limit)
+  - Separate display for package vs repository deps
+- ✅ 86 dependencies tracked across 13 repositories
+
+**3. Multi-Language Expansion**
+
+- ✅ Extended from JavaScript/TypeScript to ALL languages
+- ✅ Now supports: Python, C#, TypeScript, JavaScript, PowerShell
+- ✅ Changed from 5 → 13 repositories in config
+- ✅ All repos analyzed and embedded
+
+**4. Bug Fixes & Polish**
+
+- ✅ Fixed repository.json → repositoryAnalysisNode data flow
+- ✅ Fixed branch selection (develop for cortside repos)
+- ✅ Improved CLI output formatting
+- ✅ Better error handling throughout
+
+### System Capabilities Now:
+
+**Query & Analysis:**
+
+```bash
+npm run query -- "analyze all repositories"
+# Analyzes 13 repos, generates embeddings, extracts dependencies (~25s)
+```
+
+**Semantic Search:**
+
+```bash
+npm run search -- "REST API"
+# Vector similarity search across all repos (~0.5s)
+```
+
+**Relationship Exploration:**
+
+```bash
+npm run relationships -- "cortside/cortside.aspnetcore"
+# Shows:
+# - Package dependencies (external NuGet packages)
+# - Repository dependencies (internal cortside libs)
+# - Repository dependents (who depends on this)
+# - Related repositories (shared dependencies)
+```
+
+### Impact:
+
+- **Before today**: MVP with embeddings only
+- **After today**: Full semantic search + dependency graph tracking
+- **Completion**: ~65% → ~75%
+- **New features**: 2 major capabilities (search + relationships)
+- **New CLI commands**: 3 total (`query`, `search`, `relationships`)
+
+---
 
 ## Recommended Approach
 
