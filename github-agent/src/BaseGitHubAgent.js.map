@@ -1,0 +1,1 @@
+{"version":3,"file":"BaseGitHubAgent.js","sourceRoot":"","sources":["BaseGitHubAgent.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,SAAS,EAAwB,MAAM,yBAAyB,CAAC;AAE1E,MAAM,OAAgB,eAAgB,SAAQ,SAAS;IACrD,YAAY,MAA2C;QACrD,KAAK,CAAC;YACJ,SAAS,EAAE,QAAQ;YACnB,GAAG,MAAM;SACV,CAAC,CAAC;IACL,CAAC;CACF"}

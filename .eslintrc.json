@@ -4,7 +4,15 @@
   "parserOptions": {
     "ecmaVersion": 2022,
     "sourceType": "module",
-    "project": "./tsconfig.json"
+    "project": [
+      "./tsconfig.json",
+      "./shared/tsconfig.json",
+      "./api-gateway/tsconfig.json",
+      "./developer-agent/tsconfig.json",
+      "./github-agent/tsconfig.json",
+      "./relationship-agent/tsconfig.json",
+      "./repository-agents/tsconfig.json"
+    ]
   },
   "plugins": ["@typescript-eslint"],
   "extends": [

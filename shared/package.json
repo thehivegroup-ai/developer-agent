@@ -1,0 +1,38 @@
+{
+  "name": "@developer-agent/shared",
+  "version": "0.1.0",
+  "description": "Shared types, utilities, and agent infrastructure",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./types": "./src/types.ts",
+    "./config": "./src/config.ts",
+    "./errors": "./src/errors.ts",
+    "./messaging": "./src/messaging/index.ts",
+    "./state": "./src/state/index.ts",
+    "./logging": "./src/logging/index.ts"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest",
+    "lint": "eslint src/**/*.ts",
+    "db:setup": "tsx src/database/setup.ts",
+    "db:migrate": "tsx src/database/migrate.ts up",
+    "db:migrate:down": "tsx src/database/migrate.ts down"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "pg": "^8.11.5",
+    "pgvector": "^0.2.0",
+    "uuid": "^10.0.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.5",
+    "@types/uuid": "^10.0.0",
+    "typescript": "^5.4.5",
+    "vitest": "^1.5.0"
+  }
+}

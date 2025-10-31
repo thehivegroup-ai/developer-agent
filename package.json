@@ -5,7 +5,13 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "shared",
+    "api-gateway",
+    "developer-agent",
+    "github-agent",
+    "relationship-agent",
+    "repository-agents",
+    "frontend"
   ],
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
@@ -14,10 +20,10 @@
     "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "db:setup": "npm run db:setup -w packages/backend",
-    "db:migrate": "npm run db:migrate -w packages/backend",
-    "db:seed": "npm run db:seed -w packages/backend",
-    "db:reset": "npm run db:reset -w packages/backend"
+    "db:setup": "npm run db:setup -w api-gateway",
+    "db:migrate": "npm run db:migrate -w api-gateway",
+    "db:seed": "npm run db:seed -w api-gateway",
+    "db:reset": "npm run db:reset -w api-gateway"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

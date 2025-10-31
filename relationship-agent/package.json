@@ -1,0 +1,27 @@
+{
+  "name": "@developer-agent/relationship-agent",
+  "version": "0.1.0",
+  "description": "Relationship Agent - Knowledge graph builder and manager",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "lint": "eslint src/**/*.ts"
+  },
+  "dependencies": {
+    "@developer-agent/shared": "*",
+    "@langchain/core": "^0.3.0",
+    "neo4j-driver": "^5.19.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.7.2",
+    "typescript": "^5.4.5",
+    "vitest": "^1.5.0"
+  }
+}

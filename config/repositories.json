@@ -2,12 +2,12 @@
   "repositories": [
     {
       "owner": "cortside",
-      "name": "coeus",
+      "name": "guidelines-agent",
       "enabled": true
     },
     {
-      "owner": "cortside",
-      "name": "cortside.mockserver",
+      "owner": "thehivegroup-ai",
+      "name": "guidelines-extension",
       "enabled": true
     },
     {
@@ -23,6 +23,46 @@
     {
       "owner": "cortside",
       "name": "cortside.restapiclient",
+      "enabled": true
+    },
+    {
+      "owner": "cortside",
+      "name": "cortside.domainevent",
+      "enabled": true
+    },
+    {
+      "owner": "cortside",
+      "name": "cortside.health",
+      "enabled": true
+    },
+    {
+      "owner": "cortside",
+      "name": "serilog.bowdlerizer",
+      "enabled": true
+    },
+    {
+      "owner": "cortside",
+      "name": "cortside.bowdlerizer",
+      "enabled": true
+    },
+    {
+      "owner": "cortside",
+      "name": "cortside.authorization",
+      "enabled": true
+    },
+    {
+      "owner": "cortside",
+      "name": "cortside.sqlreportapi",
+      "enabled": true
+    },
+    {
+      "owner": "cortside",
+      "name": "cortside.healthmonitor",
+      "enabled": true
+    },
+    {
+      "owner": "cortside",
+      "name": "cortside.restfs",
       "enabled": true
     }
   ],

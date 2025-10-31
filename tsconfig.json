@@ -29,22 +29,16 @@
     "sourceMap": true,
 
     "paths": {
-      "@backend/*": ["./packages/backend/src/*"],
-      "@frontend/*": ["./packages/frontend/src/*"],
-      "@shared/*": ["./packages/shared/src/*"]
+      "@developer-agent/*": ["./*"]
     }
   },
   "include": [
-    "packages/*/src/**/*",
+    "shared/**/*",
+    "api-gateway/**/*",
     "developer-agent/**/*",
     "github-agent/**/*",
     "relationship-agent/**/*",
-    "repository-agent-csharp-api/**/*",
-    "repository-agent-csharp-library/**/*",
-    "repository-agent-node-api/**/*",
-    "repository-agent-react/**/*",
-    "repository-agent-angular/**/*",
-    "agents-shared/**/*"
+    "repository-agents/**/*"
   ],
   "exclude": ["node_modules", "dist", "build"]
 }

@@ -9,12 +9,14 @@
   "files.exclude": {
     "**/node_modules": true,
     "**/dist": true,
-    "**/.git": true
+    "**/.git": true,
+    "**/packages": true
   },
   "search.exclude": {
     "**/node_modules": true,
     "**/dist": true,
-    "**/build": true
+    "**/build": true,
+    "**/packages": true
   },
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"

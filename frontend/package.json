@@ -1,0 +1,29 @@
+{
+  "name": "@developer-agent/frontend",
+  "version": "0.1.0",
+  "description": "React Frontend - User interface with chatbot and visualizations",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "lint": "eslint src/**/*.{ts,tsx}"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.22.0",
+    "socket.io-client": "^4.7.0",
+    "@tanstack/react-query": "^5.28.0",
+    "axios": "^1.6.7"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "typescript": "^5.4.5",
+    "vite": "^5.1.6",
+    "vitest": "^1.5.0"
+  }
+}
