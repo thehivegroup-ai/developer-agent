@@ -22,3 +22,19 @@ export {
   extractNpmDependencies,
   extractNuGetDependencies,
 } from './dependency-extractor.js';
+export {
+  getOrCreateUser,
+  getUserByUsername,
+  createConversation,
+  getConversation,
+  getConversationsByUser,
+  updateConversationTitle,
+  createMessage,
+  getMessagesByConversation,
+  createQuery,
+  updateQueryStatus,
+  getQuery,
+  logAgentActivity,
+  getAgentActivityByQuery,
+} from './chat-service.js';
+export type { User, Conversation, Message, Query, AgentActivity } from './chat-service.js';

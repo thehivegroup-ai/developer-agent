@@ -7,8 +7,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load environment variables from root directory
-config({ path: path.resolve(__dirname, '../../../../.env.local') });
-config({ path: path.resolve(__dirname, '../../../../.env') });
+config({ path: path.resolve(__dirname, '../../../.env.local') });
+config({ path: path.resolve(__dirname, '../../../.env') });
 
 // Parse and validate environment configuration
 const envConfig = EnvConfigSchema.parse(process.env);

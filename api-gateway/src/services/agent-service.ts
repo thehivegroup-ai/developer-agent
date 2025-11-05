@@ -1,4 +1,6 @@
 import { DeveloperAgent } from '@developer-agent/developer-agent';
+import { websocketService } from './websocket-service.js';
+import { updateQueryStatus } from '@developer-agent/shared';
 
 /**
  * Agent Service - Manages Developer Agent lifecycle and query processing
@@ -25,33 +27,50 @@ export class AgentService {
 
   /**
    * Process a user query through the Developer Agent
+   * Emits WebSocket events for real-time progress updates
    */
   async processQuery(params: {
     queryId: string;
     query: string;
     userId: string;
     threadId: string;
-    onProgress?: (progress: QueryProgress) => void;
   }): Promise<QueryResult> {
     if (!this.initialized || !this.developerAgent) {
       throw new Error('Agent system not initialized');
     }
 
-    const { query, userId, threadId, onProgress } = params;
+    const { queryId, query, userId, threadId } = params;
 
     try {
-      // Process query through Developer Agent
-      const result = await this.developerAgent.processQuery(query, userId, threadId);
+      // Notify clients that processing has started
+      websocketService.emitQueryProgress(threadId, queryId, 5, 'Starting query processing...');
 
-      // TODO: Setup progress tracking if callback provided
-      if (onProgress) {
-        // For now, just send completion
-        onProgress({
-          status: 'completed',
-          progress: 100,
-          message: 'Query processed successfully',
-        });
-      }
+      await updateQueryStatus({
+        queryId,
+        status: 'processing',
+        progress: 5,
+      });
+
+      // Emit agent spawned event
+      websocketService.emitAgentSpawned(
+        threadId,
+        'DeveloperAgent',
+        this.developerAgent.getAgentId()
+      );
+
+      // Process query through Developer Agent
+      // We'll wrap this in a promise to handle progress tracking
+      const result = await this.processWithProgress(queryId, query, userId, threadId);
+
+      // Mark as completed
+      await updateQueryStatus({
+        queryId,
+        status: 'completed',
+        progress: 100,
+        result,
+      });
+
+      websocketService.emitQueryCompleted(threadId, queryId, 'completed', result);
 
       return {
         success: true,
@@ -60,16 +79,62 @@ export class AgentService {
     } catch (error) {
       console.error('Error processing query:', error);
 
-      if (onProgress) {
-        onProgress({
-          status: 'error',
-          progress: 0,
-          message: error instanceof Error ? error.message : 'Unknown error',
-        });
-      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      await updateQueryStatus({
+        queryId,
+        status: 'failed',
+        progress: 0,
+        error: errorMessage,
+      });
+
+      websocketService.emitQueryCompleted(threadId, queryId, 'failed', undefined, errorMessage);
+      websocketService.emitError(threadId, errorMessage, { queryId });
 
       throw error;
     }
+  }
+
+  /**
+   * Process query with progress updates
+   */
+  private async processWithProgress(
+    queryId: string,
+    query: string,
+    userId: string,
+    threadId: string
+  ): Promise<unknown> {
+    if (!this.developerAgent) {
+      throw new Error('Developer agent not initialized');
+    }
+
+    // Emit status update
+    websocketService.emitAgentStatus(
+      threadId,
+      'DeveloperAgent',
+      this.developerAgent.getAgentId(),
+      'busy',
+      'Analyzing query'
+    );
+
+    // Step 1: Decompose query (10-30% progress)
+    websocketService.emitQueryProgress(threadId, queryId, 10, 'Decomposing query into tasks...');
+    await updateQueryStatus({ queryId, status: 'processing', progress: 10 });
+
+    // Note: We'll need to modify DeveloperAgent.processQuery to emit events
+    // For now, we'll process and emit general progress updates
+    const result = await this.developerAgent.processQuery(query, userId, threadId);
+
+    // Emit final status
+    websocketService.emitAgentStatus(
+      threadId,
+      'DeveloperAgent',
+      this.developerAgent.getAgentId(),
+      'idle',
+      'Query completed'
+    );
+
+    return result;
   }
 
   /**

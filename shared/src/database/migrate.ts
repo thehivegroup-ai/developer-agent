@@ -29,7 +29,7 @@ export async function runMigrations(pool: Pool): Promise<void> {
     const appliedMigrations = new Set(result.rows.map((row) => row.migration_name));
 
     // Migration files in order
-    const migrations = ['001_create_embeddings_table.sql'];
+    const migrations = ['001_create_embeddings_table.sql', '002_create_chat_tables.sql'];
 
     for (const migrationFile of migrations) {
       if (appliedMigrations.has(migrationFile)) {

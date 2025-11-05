@@ -48,6 +48,13 @@ export abstract class BaseAgent implements IAgent {
   }
 
   /**
+   * Get the agent's unique identifier
+   */
+  getAgentId(): string {
+    return this.agentId;
+  }
+
+  /**
    * Initialize the agent - load resources, connect to services, etc.
    */
   abstract init(): Promise<void>;
