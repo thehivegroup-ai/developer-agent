@@ -12,6 +12,8 @@ import {
   getMessagesByConversation,
   createQuery,
   getQuery,
+  type Conversation,
+  type Message,
 } from '@developer-agent/shared';
 import { websocketService } from '../services/websocket-service.js';
 import { getAgentService } from '../services/agent-service.js';
@@ -65,7 +67,7 @@ export interface CreateConversationResponse {
 /**
  * Register chat routes
  */
-export async function chatRoutes(fastify: FastifyInstance) {
+export function chatRoutes(fastify: FastifyInstance) {
   /**
    * POST /api/chat/message
    * Send a message (query) to the agent system
@@ -137,7 +139,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
         );
 
         // Send immediate response
-        reply.code(202).send({
+        await reply.code(202).send({
           queryId,
           conversationId: conversation.id,
           status: 'processing',
@@ -146,7 +148,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
 
         // Process query asynchronously (don't await - fire and forget)
         const agentService = getAgentService();
-        agentService
+        void agentService
           .processQuery({
             queryId,
             query: message,
@@ -158,7 +160,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
           });
       } catch (error) {
         fastify.log.error({ error, username, conversationId, message }, 'Error processing message');
-        reply.code(500).send({
+        await reply.code(500).send({
           error: 'Failed to process message',
           details: error instanceof Error ? error.message : 'Unknown error',
         });
@@ -192,8 +194,8 @@ export async function chatRoutes(fastify: FastifyInstance) {
 
         // TODO: Optionally get message count for each conversation
 
-        reply.send({
-          conversations: conversations.map((conv) => ({
+        await reply.send({
+          conversations: conversations.map((conv: Conversation) => ({
             id: conv.id,
             title: conv.title,
             createdAt: conv.createdAt.toISOString(),
@@ -202,7 +204,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
         } as GetConversationsResponse);
       } catch (error) {
         fastify.log.error({ error, username }, 'Error fetching conversations');
-        reply.code(500).send({
+        await reply.code(500).send({
           error: 'Failed to fetch conversations',
           details: error instanceof Error ? error.message : 'Unknown error',
         });
@@ -252,8 +254,8 @@ export async function chatRoutes(fastify: FastifyInstance) {
 
         const messages = await getMessagesByConversation(conversationId, limit);
 
-        reply.send({
-          messages: messages.map((msg) => ({
+        await reply.send({
+          messages: messages.map((msg: Message) => ({
             id: msg.id,
             role: msg.role,
             content: msg.content,
@@ -264,7 +266,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
         } as GetMessagesResponse);
       } catch (error) {
         fastify.log.error({ error, conversationId }, 'Error fetching messages');
-        reply.code(500).send({
+        await reply.code(500).send({
           error: 'Failed to fetch messages',
           details: error instanceof Error ? error.message : 'Unknown error',
         });
@@ -297,14 +299,14 @@ export async function chatRoutes(fastify: FastifyInstance) {
         const user = await getOrCreateUser(username);
         const conversation = await createConversation(user.id, title);
 
-        reply.code(201).send({
+        await reply.code(201).send({
           conversationId: conversation.id,
           title: conversation.title,
           createdAt: conversation.createdAt.toISOString(),
         } as CreateConversationResponse);
       } catch (error) {
         fastify.log.error({ error, username, title }, 'Error creating conversation');
-        reply.code(500).send({
+        await reply.code(500).send({
           error: 'Failed to create conversation',
           details: error instanceof Error ? error.message : 'Unknown error',
         });
@@ -339,7 +341,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
           return reply.code(404).send({ error: 'Query not found' });
         }
 
-        reply.send({
+        await reply.send({
           queryId: query.id,
           conversationId: query.conversationId,
           status: query.status,
@@ -352,7 +354,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
         });
       } catch (error) {
         fastify.log.error({ error, queryId }, 'Error fetching query status');
-        reply.code(500).send({
+        await reply.code(500).send({
           error: 'Failed to fetch query status',
           details: error instanceof Error ? error.message : 'Unknown error',
         });

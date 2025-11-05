@@ -41,7 +41,7 @@ export interface Query {
   queryText: string;
   status: 'processing' | 'completed' | 'failed';
   progress: number;
-  result: unknown | null;
+  result: unknown;
   error: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -206,15 +206,25 @@ export async function getConversationsByUser(userId: string): Promise<Conversati
     [userId]
   );
 
-  return result.rows.map((row) => ({
-    id: row.id,
-    userId: row.user_id,
-    title: row.title,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    isActive: row.is_active,
-    metadata: row.metadata,
-  }));
+  return result.rows.map(
+    (row: {
+      id: string;
+      user_id: string;
+      title: string;
+      created_at: Date;
+      updated_at: Date;
+      is_active: boolean;
+      metadata: Record<string, unknown>;
+    }) => ({
+      id: row.id,
+      userId: row.user_id,
+      title: row.title,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      isActive: row.is_active,
+      metadata: row.metadata,
+    })
+  );
 }
 
 /**
@@ -290,15 +300,25 @@ export async function getMessagesByConversation(
     [conversationId, limit]
   );
 
-  return result.rows.map((row) => ({
-    id: row.id,
-    threadId: row.thread_id,
-    role: row.role,
-    content: row.content,
-    metadata: row.metadata,
-    parentMessageId: row.parent_message_id,
-    createdAt: row.created_at,
-  }));
+  return result.rows.map(
+    (row: {
+      id: string;
+      thread_id: string;
+      role: string;
+      content: string;
+      metadata: Record<string, unknown>;
+      parent_message_id: string | null;
+      created_at: Date;
+    }) => ({
+      id: row.id,
+      threadId: row.thread_id,
+      role: row.role,
+      content: row.content,
+      metadata: row.metadata,
+      parentMessageId: row.parent_message_id,
+      createdAt: row.created_at,
+    })
+  );
 }
 
 /**
@@ -327,7 +347,7 @@ export async function createQuery(params: {
     ]
   );
 
-  const sessionId = sessionResult.rows[0].id;
+  const sessionId = (sessionResult.rows[0] as { id: string }).id;
 
   // Now create a task linked to this session
   const result = await pool.query(
@@ -478,7 +498,7 @@ export async function logAgentActivity(params: {
     ]
   );
 
-  const row = result.rows[0];
+  const row = result.rows[0] as { id: number; created_at: Date };
 
   return {
     id: row.id,
@@ -505,17 +525,28 @@ export async function getAgentActivityByQuery(queryId: string): Promise<AgentAct
     [queryId]
   );
 
-  return result.rows.map((row) => {
-    const metadata = row.metadata || {};
-    return {
-      id: row.id,
-      queryId,
-      conversationId: metadata.conversationId || '',
-      eventType: row.message_type,
-      agentType: metadata.agentType || null,
-      agentId: metadata.agentId || null,
-      data: typeof row.content === 'string' ? JSON.parse(row.content) : row.content,
-      createdAt: row.created_at,
-    };
-  });
+  return result.rows.map(
+    (row: {
+      id: number;
+      message_type: string;
+      content: string | Record<string, unknown>;
+      metadata: Record<string, unknown>;
+      created_at: Date;
+    }) => {
+      const metadata = row.metadata || {};
+      return {
+        id: row.id,
+        queryId,
+        conversationId: (metadata.conversationId as string) || '',
+        eventType: row.message_type,
+        agentType: (metadata.agentType as string) || null,
+        agentId: (metadata.agentId as string) || null,
+        data:
+          typeof row.content === 'string'
+            ? (JSON.parse(row.content) as Record<string, unknown>)
+            : row.content,
+        createdAt: row.created_at,
+      };
+    }
+  );
 }
