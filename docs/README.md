@@ -1,11 +1,13 @@
 # A2A Multi-Agent System Documentation
 
 ## Overview
+
 This system demonstrates Agent-to-Agent (A2A) communication using LangGraph, enabling multiple specialized agents to collaborate in analyzing GitHub repositories and building a knowledge graph of their relationships.
 
 ## System Architecture
 
 ### Core Components
+
 1. **Developer Agent** - Central coordinator
 2. **GitHub Agent** - Repository discovery
 3. **Repository Agents** - Specialized code analysis (5 types)
@@ -15,6 +17,7 @@ This system demonstrates Agent-to-Agent (A2A) communication using LangGraph, ena
 7. **Neo4j** - Knowledge graph storage
 
 ### Technology Stack
+
 - **Framework**: LangGraph
 - **Runtime**: TypeScript/Node.js
 - **Frontend**: React
@@ -26,41 +29,50 @@ This system demonstrates Agent-to-Agent (A2A) communication using LangGraph, ena
 ## Agent Capabilities
 
 ### Developer Agent
+
 Central orchestrator that coordinates all agent activities. **Now AI-powered** with GPT-4 integration for intelligent query decomposition, context-aware response generation, and smart agent coordination. Monitors agent communication and synthesizes results with natural language explanations.
 
 ### GitHub Agent
+
 Discovers and analyzes GitHub repositories, detects repository types, manages rate limiting, and provides metadata to other agents.
 
 ### Repository Agents
+
 Five specialized agent types (C# API, C# Library, Node API, React, Angular) that perform semantic search over codebases, generate embeddings, and provide code analysis.
 
 ### Relationship Agent
+
 Builds and maintains a knowledge graph in Neo4j, tracking dependencies (direct, indirect, API consumption) and supporting incremental updates.
 
 ## Key Features
 
 ### Multi-User Support
+
 - Simple username-based identification
 - Separate conversation histories per user
 - Multiple conversation threads per user
 
 ### Real-Time Communication
+
 - WebSocket-based real-time updates
 - Visible agent-to-agent communication
 - Progress indicators for long operations
 
 ### Knowledge Graph
+
 - Interactive visualization
 - Automatic relationship discovery
 - Persistent between sessions
 - Incremental updates
 
 ### Semantic Search
+
 - OpenAI embeddings
 - pgvector storage
 - Index-on-first-access strategy
 
 ### AI-Powered Query Processing (New in Phase 7) 🤖
+
 - **Intelligent Query Decomposition**: GPT-4 understands user intent and breaks queries into optimal tasks
 - **Context-Aware Responses**: Synthesizes agent results into natural language explanations
 - **Repository Analysis**: AI-powered insights about code architecture and technologies
@@ -81,6 +93,7 @@ Builds and maintains a knowledge graph in Neo4j, tracking dependencies (direct, 
 ## Configuration
 
 ### Environment Variables (.env.local)
+
 - PostgreSQL connection
 - Neo4j connection
 - OpenAI API key
@@ -89,6 +102,7 @@ Builds and maintains a knowledge graph in Neo4j, tracking dependencies (direct, 
 - Agent TTL settings
 
 ### Repository Configuration (repositories.json)
+
 JSON file listing public repositories to monitor and analyze.
 
 ## Design Principles
@@ -111,4 +125,4 @@ JSON file listing public repositories to monitor and analyze.
 
 ---
 
-*Last Updated: November 5, 2025*
+_Last Updated: November 5, 2025_
