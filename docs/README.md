@@ -1,8 +1,19 @@
 # A2A Multi-Agent System Documentation
 
+**Last Updated:** November 5, 2025  
+**Status:** Active
+
+## Quick Links
+
+- **[Project Information](PROJECT_INFO.md)** - Technology stack, architecture, build commands
+- **[Reorganization Plan](REORGANIZATION_PLAN.md)** - Documentation reorganization tasks
+- **Architecture:** See `architecture/` directory
+- **Requirements:** See `requirements/` directory
+- **Completed Work:** See `completed/` directory
+
 ## Overview
 
-This system demonstrates Agent-to-Agent (A2A) communication using LangGraph, enabling multiple specialized agents to collaborate in analyzing GitHub repositories and building a knowledge graph of their relationships.
+This system demonstrates Agent-to-Agent (A2A) communication, enabling multiple specialized agents to collaborate in analyzing GitHub repositories and building a knowledge graph of their relationships.
 
 ## System Architecture
 

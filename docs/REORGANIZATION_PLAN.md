@@ -1,17 +1,22 @@
 # Documentation Reorganization Plan
 
 **Date:** November 5, 2025  
-**Status:** Pending Execution
+**Status:** Pending Execution  
+**Project:** Developer Agent Repository
+
+> **Note:** This document contains the **project-specific reorganization plan** for this repository. The authoritative documentation standards (HOW to organize) are in `.github/instructions/documentation.instructions.md`. This file describes WHAT needs to be reorganized in THIS repository.
 
 ## Current State Analysis
 
 ### Root Directory Issues
+
 - ❌ `AI_INTEGRATION_SUMMARY.md` - Should be in docs/completed/
 - ❌ `DEVELOPMENT_ROADMAP.md` - Should be in memory-bank/planning/
 - ❌ `PHASE7_TESTING_SUMMARY.md` - Should be in docs/completed/
 - ✅ `README.md` - Correct location
 
 ### docs/ Directory Issues
+
 - ✅ `README.md` - Good index
 - ❌ `OPENAI_INTEGRATION.md` - Should be in docs/completed/ (feature complete)
 - ❌ `PHASE8_AI_ENHANCEMENT_PLAN.md` - Should be in memory-bank/planning/
@@ -20,6 +25,7 @@
 - ✅ `PHASE1_PROGRESS.md`, etc. - Should stay (historical)
 
 ### memory-bank/ Directory
+
 - ✅ `planning/` exists with some content
 - ❌ Missing `current/` directory
 - ❌ Missing `archive/` directory
@@ -39,9 +45,11 @@ mkdir -p docs/completed
 ### Step 2: Move Planning Documents
 
 **From Root → memory-bank/planning/**
+
 - `DEVELOPMENT_ROADMAP.md`
 
 **From docs/ → memory-bank/planning/**
+
 - `PHASE8_AI_ENHANCEMENT_PLAN.md`
 - `PHASE9_AI_TESTING_PLAN.md`
 - `PHASE10_DEPLOYMENT_PLAN.md`
@@ -49,10 +57,12 @@ mkdir -p docs/completed
 ### Step 3: Move Completed Documentation
 
 **From Root → docs/completed/**
+
 - `AI_INTEGRATION_SUMMARY.md`
 - `PHASE7_TESTING_SUMMARY.md`
 
 **From docs/ → docs/completed/**
+
 - `OPENAI_INTEGRATION.md` (Phase 7 complete)
 - `PHASE6_COMPLETION.md` (if exists)
 - `PHASE6_ENHANCEMENTS.md` (if exists)
@@ -60,6 +70,7 @@ mkdir -p docs/completed
 ### Step 4: Organize Requirements
 
 **From memory-bank/planning/ → docs/requirements/**
+
 - `initial-requirements.md`
 - `api-contracts.md`
 - `database-schemas.md`
@@ -67,28 +78,33 @@ mkdir -p docs/completed
 ### Step 5: Organize Architecture
 
 **From docs/ → docs/architecture/**
+
 - `ARCHITECTURE.md` (if exists)
 - Create new: `agent-communication-protocol.md` (extract from memory-bank)
 
 ### Step 6: Archive Old Memory Bank Content
 
 **From memory-bank/planning/ → memory-bank/archive/**
+
 - Old planning documents for completed phases
 - Completed spike documents
 
 ### Step 7: Update README Files
 
 **Root README.md:**
+
 - Remove detailed phase information
 - Keep only: What it is, how to build, test, run
 - Add single link to `docs/README.md` for more info
 
 **docs/README.md:**
+
 - Update all file paths
 - Organize by: Requirements, Architecture, Completed Phases
 - Add links to memory-bank for current work
 
 **memory-bank/README.md:**
+
 - Create if missing
 - Explain purpose of directory
 - Link to current work
@@ -101,7 +117,7 @@ mkdir -p docs/completed
 developer-agent/
 ├── README.md                                    # What, build, test, run
 ├── DOCUMENTATION_STANDARDS.md                   # This standards guide
-├── 
+├──
 ├── docs/
 │   ├── README.md                               # Documentation index
 │   ├── requirements/
@@ -139,7 +155,7 @@ developer-agent/
 ```bash
 # Step 1: Create directories
 mkdir -p memory-bank/current
-mkdir -p memory-bank/archive  
+mkdir -p memory-bank/archive
 mkdir -p docs/requirements
 mkdir -p docs/architecture
 mkdir -p docs/completed
@@ -175,22 +191,26 @@ git mv memory-bank/planning/development-phases.md memory-bank/archive/ 2>/dev/nu
 ## Files to Update After Reorganization
 
 ### 1. Root README.md
+
 - Remove Phase 8-10 details (keep high-level status)
 - Remove detailed AI integration info
 - Keep only essential info
 - Add: "See [docs/README.md](docs/README.md) for detailed documentation"
 
 ### 2. docs/README.md
+
 - Update all file paths
 - Add sections for Requirements, Architecture, Completed
 - Link to memory-bank for current work
 
 ### 3. memory-bank/README.md (create new)
+
 - Explain purpose
 - Note: Internal team use
 - Link to current, planning, archive sections
 
 ### 4. Update Links in Moved Files
+
 - Search for internal links in all moved files
 - Update relative paths
 - Verify links still work
@@ -198,6 +218,7 @@ git mv memory-bank/planning/development-phases.md memory-bank/archive/ 2>/dev/nu
 ## Verification Checklist
 
 After reorganization:
+
 - [ ] All files in correct locations per DOCUMENTATION_STANDARDS.md
 - [ ] No documentation in root except README.md and DOCUMENTATION_STANDARDS.md
 - [ ] docs/ contains only requirements, architecture, completed

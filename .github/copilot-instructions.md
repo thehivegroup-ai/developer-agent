@@ -1,196 +1,256 @@
-# Developer Agent Repository Instructions
+# Repository Development Instructions
 
-## Project Overview
+**Status:** Authoritative  
+**Scope:** Universal development practices (portable to any project)  
+**Last Updated:** November 5, 2025
 
-This is a multi-agent A2A (Agent-to-Agent) system built with TypeScript, supporting multiple repository types (Node.js APIs, React frontends, Angular apps, C# APIs/libraries). The system uses AI agents (OpenAI GPT-4) to coordinate development tasks across repositories.
+This document defines **HOW** to work with this repository type. For project-specific details (WHAT this project does), see `docs/README.md`.
 
-## Repository Structure
+## Project-Specific Information
 
-```
-developer-agent/
-├── api-gateway/          # Express API with PostgreSQL, WebSocket support
-├── developer-agent/      # Core developer agent orchestration
-├── github-agent/         # GitHub API integration
-├── relationship-agent/   # Repository relationship management
-├── repository-agents/    # Repository-specific agents (Node, React, Angular, C#)
-├── shared/              # Shared types, utilities, base classes
-├── frontend/            # React frontend (Vite)
-├── docs/                # Long-term documentation
-├── memory-bank/         # Active work and planning
-└── scripts/             # Utility scripts
-```
+**For details about THIS project:**
 
-## Technology Stack
+- See `docs/README.md` for architecture, structure, and technology stack
+- See root `README.md` for quick start and build instructions
+- See `docs/architecture/` for system design
+- See `docs/requirements/` for project requirements
 
-- **Runtime:** Node.js 20.x
-- **Language:** TypeScript 5.x with ES modules
-- **Build:** tsc (TypeScript compiler)
-- **Testing:** Vitest 1.5.0 (frontend), 1.6.1 (backend)
-- **Database:** PostgreSQL 15+
-- **AI:** OpenAI GPT-4 (basic integration complete, streaming planned)
-- **Frontend:** React 18, Vite 5.2
-- **API:** Express 4.x with WebSocket support
+## Build & Test Standards
 
-## Build & Test Commands
+**Always check `README.md` for project-specific commands.** Common patterns:
 
-**Build (ALL workspaces):**
+### Building
+
 ```bash
-npm run build
+npm run build          # Build all workspaces
+npm run build --workspace=package-name  # Build specific package
 ```
 
-**Test (ALL tests - 153 total):**
+**Best Practices:**
+
+- Always build from root in monorepos
+- Build before running tests
+- Clean build: `rm -rf dist/ node_modules/ && npm install && npm run build`
+
+### Testing
+
 ```bash
-npm test
+npm test              # Run all tests
+npm test -- path/to/test.test.ts  # Run specific test
+npm test -- --watch   # Watch mode
 ```
 
-**Run Development:**
+**Best Practices:**
+
+- Ensure build is current before testing
+- Use `describe` and `it` for clear test structure
+- Mock external dependencies (APIs, databases, file system)
+- Test behavior, not implementation
+
+### Development
+
 ```bash
-# Terminal 1 - API Gateway
-cd api-gateway && npm run dev
-
-# Terminal 2 - Frontend
-cd frontend && npm run dev
+npm run dev           # Start development server
+npm run lint          # Lint code
+npm run format        # Format code
 ```
 
-**Important Notes:**
-- Always run `npm run build` from root (builds all workspaces in correct order)
-- Build takes ~6 seconds
-- Must build before running tests
-- Frontend runs on http://localhost:5173
-- API Gateway runs on http://localhost:3000
+**Best Practices:**
 
-## Current Status (November 2025)
-
-- ✅ Phase 7 Complete (100%) - AI Integration (OpenAI GPT-4)
-- 🔄 Phase 8 Next - Advanced AI Enhancement (streaming, function calling, memory)
-- 153 passing tests (19 shared + 24 API + 110 frontend)
-- All core agents implemented and tested
-
-## Code Organization
-
-**Shared Base Classes:**
-- `BaseAgent` - All agents extend this
-- `BaseRepositoryAgent` - Repository agents extend this
-- Agents are organized by responsibility
-
-**Agent Communication:**
-- Uses `AgentMessage` type for all communication
-- WebSocket for real-time updates
-- PostgreSQL for state persistence
-
-**Testing:**
-- Unit tests in `__tests__/` directories
-- Integration tests in `tests/` at package level
-- Use Vitest for all testing
-- Mock external dependencies (GitHub, OpenAI)
-
-## Common Patterns
-
-**Creating New Agents:**
-```typescript
-import { BaseAgent } from '@repo/shared';
-
-export class MyAgent extends BaseAgent {
-  async execute(message: AgentMessage): Promise<AgentResponse> {
-    // Implementation
-  }
-}
-```
-
-**Error Handling:**
-- Use custom error classes from `shared/src/errors.ts`
-- Always include context in errors
-- Log errors with appropriate level
-
-**Database Queries:**
-- Use parameterized queries (never string concatenation)
-- Handle connection errors gracefully
-- Use transactions for multi-step operations
+- Check for linting/formatting before committing
+- Use hot-reload in development
+- Handle errors gracefully with meaningful messages
 
 ## Development Workflow
 
-1. Create feature branch from `master`
-2. Make changes
-3. Run `npm run build` to verify compilation
-4. Run `npm test` to verify tests pass
-5. Commit with descriptive message
-6. Push and create PR
+### Branch Strategy
 
-## AI Integration
+1. Create feature branch from main/master branch
+2. Make changes in focused commits
+3. Write/update tests for changes
+4. Run build and tests before committing
+5. Write descriptive commit messages
+6. Push and create pull request
+7. Address review feedback
 
-**Current Capabilities:**
-- Basic chat with OpenAI GPT-4
-- Context-aware responses
-- Agent-specific prompting
+### Commit Message Standards
 
-**Planned (Phase 8):**
-- Streaming responses
-- Function calling for agent tools
-- Conversation memory
-- Multi-model support (Anthropic, Ollama)
-- Smart caching
+```
+type(scope): brief description
 
-## Important Conventions
+Detailed explanation if needed.
 
-**File Naming:**
-- PascalCase for classes: `BaseDeveloperAgent.ts`
-- camelCase for utilities: `config.ts`, `utils.ts`
-- Test files: `*.test.ts`
+Fixes #123
+```
 
-**Imports:**
-- Use workspace imports: `@repo/shared`
-- Use relative imports within same package: `./utils`
-- Always use `.js` extension in imports (ES modules)
+**Types:** feat, fix, docs, style, refactor, test, chore
 
-**TypeScript:**
-- Strict mode enabled
-- No `any` types (use `unknown` if needed)
-- Export types from index files
+**Examples:**
+
+- `feat(api): add user authentication endpoint`
+- `fix(frontend): resolve navigation bug on mobile`
+- `docs: update installation instructions`
+
+### Code Review Practices
+
+- Keep PRs focused and reasonably sized
+- Write clear PR descriptions
+- Respond to feedback constructively
+- Update documentation with code changes
+
+## Coding Conventions
+
+### File Naming
+
+- **Classes:** PascalCase (`UserService.ts`, `BaseAgent.ts`)
+- **Utilities:** camelCase (`config.ts`, `helpers.ts`, `utils.ts`)
+- **Tests:** `*.test.ts` or `*.spec.ts`
+- **Types:** `types.ts` or `*.types.ts`
+- **Constants:** `constants.ts` or `CONSTANTS.ts`
+
+### Code Structure
+
+- One class per file (unless tightly coupled)
+- Group related files in directories
+- Export public API from `index.ts`
+- Keep functions focused and small
+- Prefer composition over inheritance
+
+### TypeScript Standards
+
+- Enable strict mode
+- Avoid `any` type (use `unknown` if needed)
+- Define interfaces for data structures
+- Export types alongside implementations
+- Use type guards for runtime checks
+
+### Import Conventions
+
+**Monorepo:**
+
+- Workspace packages: `import { X } from '@repo/shared'`
+- Same package: `import { X } from './utils'`
+- Use `.js` extensions for ESM: `import { X } from './utils.js'`
+
+**Standard:**
+
+- External packages first
+- Internal imports second
+- Group and alphabetize imports
+
+### Error Handling
+
+- Create custom error classes for domain errors
+- Always include context in errors
+- Log at appropriate levels (debug, info, warn, error)
+- Don't swallow errors silently
+- Provide actionable error messages
+
+### Async Patterns
+
+- Use `async/await` over raw promises
+- Handle promise rejections
+- Don't mix callbacks and promises
+- Use `Promise.all()` for parallel operations
+- Avoid sequential awaits when not needed
+
+### Testing Patterns
+
+- Test behavior, not implementation
+- Use descriptive test names: `it('should return user when ID exists')`
+- Follow AAA pattern: Arrange, Act, Assert
+- Mock external dependencies
+- Test edge cases and error conditions
 
 ## Common Issues & Solutions
 
 **Build Failures:**
-- Clean: `rm -rf dist/ node_modules/`
-- Reinstall: `npm install`
-- Rebuild: `npm run build`
+
+- Clean build artifacts: `rm -rf dist/ build/`
+- Reinstall dependencies: `rm -rf node_modules/ && npm install`
+- Clear caches: `npm cache clean --force`
+- Check Node.js version matches project requirements
 
 **Test Failures:**
-- Ensure build is current: `npm run build`
-- Check for environmental issues (DB, API keys)
-- Run individual test: `npm test -- path/to/test.test.ts`
 
-**Import Errors:**
-- Verify workspace dependencies in `package.json`
-- Check `.js` extensions in imports
-- Ensure build artifacts exist in `dist/`
+- Ensure build is current
+- Check environment variables are set
+- Verify external services (DB, APIs) are running
+- Run individual test to isolate issue: `npm test -- path/to/test`
+- Check for race conditions in async tests
 
-## Environment Variables
+**Import/Module Errors:**
 
-Required in `.env`:
-```bash
-DATABASE_URL=postgresql://user:pass@localhost:5432/devagent
-OPENAI_API_KEY=sk-...
-GITHUB_TOKEN=ghp_...
-PORT=3000
-```
+- Verify package is in `package.json` dependencies
+- Check import paths are correct
+- Ensure build artifacts exist for local packages
+- For ESM: verify `.js` extensions in imports
+- Clear module cache and rebuild
 
-## Performance Considerations
+**Type Errors:**
 
-- Build time: ~6 seconds for all workspaces
-- Test time: ~5-10 seconds for full suite
-- Database queries: Use indexes, avoid N+1
-- AI calls: Cache when possible, implement streaming
+- Run `tsc --noEmit` to see all type errors
+- Check type definitions are installed (`@types/*` packages)
+- Verify TypeScript version compatibility
+- Use `unknown` instead of `any` for flexibility
 
-## Security Notes
+## Environment & Configuration
 
-- Never commit `.env` files
-- API keys in environment variables only
-- Sanitize user input
-- Use parameterized database queries
-- Validate all external input
+### Environment Variables
+
+- Store in `.env` file (never commit)
+- Provide `.env.template` or `.env.example`
+- Document all required variables
+- Validate on startup
+- Use different files for environments (`.env.development`, `.env.production`)
+
+### Configuration Files
+
+- Keep configuration separate from code
+- Use environment variables for secrets
+- Provide sensible defaults
+- Document configuration options
+- Validate configuration on load
+
+## Performance Best Practices
+
+- Profile before optimizing
+- Use appropriate data structures
+- Cache expensive computations
+- Batch database queries
+- Use indexes for frequently queried fields
+- Implement pagination for large data sets
+- Use streaming for large files
+- Lazy load when possible
+
+## Security Best Practices
+
+- Never commit secrets or API keys
+- Use environment variables for sensitive data
+- Validate and sanitize all user input
+- Use parameterized queries (prevent SQL injection)
+- Implement rate limiting
+- Keep dependencies up to date
+- Use HTTPS in production
+- Implement proper authentication and authorization
 
 ---
 
-**When in doubt about documentation organization, refer to `.github/instructions/documentation.instructions.md`**
+## 📚 Documentation Philosophy
 
-**For path-specific instructions, check `.github/instructions/` for relevant files**
+**`.github/` = HOW (behavior standards) - Portable to other projects**
+
+- `.github/copilot-instructions.md` - How to work with this repository (you're reading it)
+- `.github/instructions/*.instructions.md` - How to handle specific file types
+
+**`docs/` = WHAT (project-specific content)**
+
+- `docs/REORGANIZATION_PLAN.md` - What needs reorganizing in THIS project
+- `docs/README.md` - Index of THIS project's documentation
+- `docs/architecture/` - THIS project's architecture
+- `docs/requirements/` - THIS project's requirements
+
+**When working on documentation:**
+
+1. Consult `.github/instructions/documentation.instructions.md` for HOW to organize
+2. Consult `docs/REORGANIZATION_PLAN.md` for WHAT to reorganize in this project
