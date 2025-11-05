@@ -15,7 +15,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "vitest",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint src/**/*.ts",
     "db:setup": "tsx src/database/setup.ts",
     "db:migrate": "tsx src/database/migrate.ts up",

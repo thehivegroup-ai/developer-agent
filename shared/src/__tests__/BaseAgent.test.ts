@@ -17,6 +17,7 @@ class TestAgent extends BaseAgent {
 
   async shutdown(): Promise<void> {
     this.shutdownCalled = true;
+    this.setStatus('destroyed');
   }
 
   getInitCalled(): boolean {

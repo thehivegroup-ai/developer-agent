@@ -11,7 +11,8 @@
     "query": "tsx src/cli.ts",
     "search": "tsx src/search.ts",
     "relationships": "tsx src/relationships.ts",
-    "test": "vitest",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
     "test:integration": "tsx tests/test-agent-integration.ts",
     "test:workflow": "tsx tests/test-workflow.ts",
     "lint": "eslint src/**/*.ts"
