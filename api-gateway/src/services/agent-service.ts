@@ -1,6 +1,7 @@
 import { DeveloperAgent } from '@developer-agent/developer-agent';
 import { websocketService } from './websocket-service.js';
 import { updateQueryStatus } from '@developer-agent/shared';
+import { getOpenAIService } from './openai-service.js';
 
 /**
  * Agent Service - Manages Developer Agent lifecycle and query processing
@@ -96,7 +97,7 @@ export class AgentService {
   }
 
   /**
-   * Process query with progress updates
+   * Process query with progress updates using AI
    */
   private async processWithProgress(
     queryId: string,
@@ -108,22 +109,56 @@ export class AgentService {
       throw new Error('Developer agent not initialized');
     }
 
+    const openaiService = getOpenAIService();
+
     // Emit status update
     websocketService.emitAgentStatus(
       threadId,
       'DeveloperAgent',
       this.developerAgent.getAgentId(),
       'busy',
-      'Analyzing query'
+      'Analyzing query with AI'
     );
 
-    // Step 1: Decompose query (10-30% progress)
-    websocketService.emitQueryProgress(threadId, queryId, 10, 'Decomposing query into tasks...');
+    // Step 1: Decompose query using AI (10-30% progress)
+    websocketService.emitQueryProgress(
+      threadId,
+      queryId,
+      10,
+      'Using AI to decompose query into tasks...'
+    );
     await updateQueryStatus({ queryId, status: 'processing', progress: 10 });
 
-    // Note: We'll need to modify DeveloperAgent.processQuery to emit events
-    // For now, we'll process and emit general progress updates
+    // Get AI-powered task decomposition
+    const tasks = await openaiService.decomposeQuery(query);
+
+    websocketService.emitQueryProgress(
+      threadId,
+      queryId,
+      30,
+      `Identified ${tasks.length} task(s) to execute`
+    );
+
+    // Step 2: Process with Developer Agent (30-80% progress)
+    websocketService.emitQueryProgress(
+      threadId,
+      queryId,
+      40,
+      'Executing tasks with specialized agents...'
+    );
+    await updateQueryStatus({ queryId, status: 'processing', progress: 40 });
+
     const result = await this.developerAgent.processQuery(query, userId, threadId);
+
+    // Step 3: Generate AI-enhanced response (80-95% progress)
+    websocketService.emitQueryProgress(threadId, queryId, 80, 'Generating intelligent response...');
+
+    const aiResponse = await openaiService.generateResponse({
+      query,
+      context: JSON.stringify(result, null, 2),
+    });
+
+    websocketService.emitQueryProgress(threadId, queryId, 95, 'Finalizing results...');
 
     // Emit final status
     websocketService.emitAgentStatus(
@@ -131,10 +166,16 @@ export class AgentService {
       'DeveloperAgent',
       this.developerAgent.getAgentId(),
       'idle',
-      'Query completed'
+      'Query completed successfully'
     );
 
-    return result;
+    return {
+      query,
+      tasks,
+      agentResult: result,
+      aiResponse,
+      timestamp: new Date().toISOString(),
+    };
   }
 
   /**

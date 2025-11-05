@@ -38,21 +38,44 @@ This will install dependencies for all workspaces (api-gateway, frontend, develo
 
 ### 3. Configure Environment
 
-Create `.env` files for backend services:
-
-**API Gateway (.env):**
+Create `.env.local` in the root directory (copy from `.env.template`):
 
 ```bash
-# Database
-DATABASE_URL=postgresql://user:password@localhost:5432/developer_agent
+# PostgreSQL Configuration
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_USER=your_postgres_user
+POSTGRES_PASSWORD=your_postgres_password
+POSTGRES_DB=a2a_agents
 
-# OpenAI
-OPENAI_API_KEY=your_openai_key_here
+# OpenAI Configuration (Required for AI features)
+OPENAI_API_KEY=sk-proj-...your-key-here...
+
+# GitHub Configuration (Optional - for higher rate limits)
+GITHUB_TOKEN=your_github_token_here
+
+# Application Configuration
+NODE_ENV=development
+PORT=3000
+LOG_LEVEL=info
+```
+
+**Getting your OpenAI API key:**
+
+1. Visit [OpenAI Platform](https://platform.openai.com/)
+2. Sign up or log in
+3. Navigate to API Keys section
+4. Create a new secret key
+5. Copy it to `.env.local`
+
+💡 **See [docs/OPENAI_INTEGRATION.md](docs/OPENAI_INTEGRATION.md) for detailed AI features documentation**
 
 # Server
+
 PORT=3000
 NODE_ENV=development
-```
+
+````
 
 ### 4. Setup Database
 
@@ -63,7 +86,7 @@ npm run db:migrate
 
 # Seed with test data (optional)
 npm run db:seed
-```
+````
 
 ### 5. Start Development Servers
 
@@ -86,6 +109,24 @@ The application will be available at:
 - Frontend: http://localhost:5173
 - API: http://localhost:3000
 - WebSocket: ws://localhost:3000
+
+### 6. Try the AI Features (Optional)
+
+Run the interactive AI demo to see intelligent query processing in action:
+
+```bash
+npm run demo:ai
+```
+
+This demonstrates:
+
+- 🧠 Smart query decomposition
+- 💬 Context-aware responses
+- 🔍 Repository analysis
+- 📊 Search result summarization
+- 💭 Conversation memory
+
+See [docs/OPENAI_INTEGRATION.md](docs/OPENAI_INTEGRATION.md) for more details.
 
 ## Project Structure
 
@@ -274,14 +315,19 @@ npm run type-check
 
 ### Current Features ✅
 
+- **🤖 AI-Powered Agent System** - OpenAI GPT-4 integration for intelligent query processing
+  - Smart query decomposition into actionable tasks
+  - Context-aware response generation
+  - Repository analysis and insights
+  - Conversation memory and multi-turn interactions
 - **Real-time Chat Interface** - Interactive conversation with developer agents
 - **Multi-Agent System** - Specialized agents for different repository types
-- **WebSocket Integration** - Live agent activity updates
+- **WebSocket Integration** - Live agent activity updates with progress tracking
 - **Repository Analysis** - Support for Node.js, Angular, React, C# APIs
-- **Conversation Management** - Persistent chat history
-- **Error Boundaries** - Graceful error handling
+- **Conversation Management** - Persistent chat history with PostgreSQL
+- **Error Boundaries** - Graceful error handling and fallback responses
 - **Responsive UI** - Modern, user-friendly interface
-- **Comprehensive Testing** - 134 tests covering backend and frontend
+- **Comprehensive Testing** - 153 tests covering backend, frontend, and shared utilities
 
 ### Agent Types
 
@@ -317,11 +363,13 @@ npm run type-check
   - WebSocket integration
   - Agent activity monitoring
 
-- **Phase 7**: Integration & Testing (~95% Complete)
+- **Phase 7**: Integration & Testing (100% Complete) ✅
   - Backend API tests (24 tests)
   - Frontend component tests (82 tests)
   - Integration tests (28 tests)
-  - Documentation
+  - Shared utilities tests (19 tests)
+  - Comprehensive documentation
+  - **AI Enhancement**: OpenAI GPT-4 integration with intelligent query processing
 
 ### Next Steps 🔄
 
@@ -330,6 +378,7 @@ npm run type-check
   - Docker containerization
   - CI/CD pipeline
   - Monitoring and logging
+  - Environment configuration management
 
 ## Configuration
 

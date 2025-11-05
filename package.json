@@ -24,7 +24,8 @@
     "db:setup": "npm run db:setup -w api-gateway",
     "db:migrate": "npm run db:migrate -w api-gateway",
     "db:seed": "npm run db:seed -w api-gateway",
-    "db:reset": "npm run db:reset -w api-gateway"
+    "db:reset": "npm run db:reset -w api-gateway",
+    "demo:ai": "tsx scripts/demo-openai.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -32,6 +33,7 @@
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.57.0",
     "prettier": "^3.2.5",
+    "tsx": "^4.7.2",
     "typescript": "^5.4.5",
     "vitest": "^1.5.0"
   },

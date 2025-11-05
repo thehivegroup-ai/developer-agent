@@ -21,11 +21,12 @@ This system demonstrates Agent-to-Agent (A2A) communication using LangGraph, ena
 - **LLM**: OpenAI (GPT-4 + Embeddings)
 - **Databases**: PostgreSQL (pgvector), Neo4j
 - **Architecture**: Monorepo
+- **AI Integration**: GPT-4 Turbo for intelligent query processing
 
 ## Agent Capabilities
 
 ### Developer Agent
-Central orchestrator that coordinates all agent activities, decomposes complex queries, monitors agent communication, and synthesizes results.
+Central orchestrator that coordinates all agent activities. **Now AI-powered** with GPT-4 integration for intelligent query decomposition, context-aware response generation, and smart agent coordination. Monitors agent communication and synthesizes results with natural language explanations.
 
 ### GitHub Agent
 Discovers and analyzes GitHub repositories, detects repository types, manages rate limiting, and provides metadata to other agents.
@@ -59,14 +60,22 @@ Builds and maintains a knowledge graph in Neo4j, tracking dependencies (direct, 
 - pgvector storage
 - Index-on-first-access strategy
 
+### AI-Powered Query Processing (New in Phase 7) 🤖
+- **Intelligent Query Decomposition**: GPT-4 understands user intent and breaks queries into optimal tasks
+- **Context-Aware Responses**: Synthesizes agent results into natural language explanations
+- **Repository Analysis**: AI-powered insights about code architecture and technologies
+- **Conversation Memory**: Multi-turn interactions with context retention
+- **Smart Agent Coordination**: Automatically selects the best agents for each task
+- See [OPENAI_INTEGRATION.md](./OPENAI_INTEGRATION.md) for details
+
 ## Data Flow
 
 1. User submits query via chatbot
-2. Developer Agent receives and decomposes query
+2. **Developer Agent uses AI to decompose query into tasks** (NEW)
 3. GitHub Agent discovers relevant repositories
 4. Repository Agents spawn on-demand and analyze code
 5. Relationship Agent updates knowledge graph
-6. Results synthesized and presented to user
+6. **AI synthesizes results into helpful responses** (NEW)
 7. Agent communication visible in UI
 
 ## Configuration
@@ -92,10 +101,14 @@ JSON file listing public repositories to monitor and analyze.
 
 ## Documentation Structure
 
-This `.documentation/` folder contains long-lived architectural and design documentation that evolves with the project.
+### Key Documents
 
-The `.memory-bank/` folder contains short-term planning documents that are completed and then archived.
+- **[OPENAI_INTEGRATION.md](./OPENAI_INTEGRATION.md)** - Complete guide to AI features and setup
+- **[../AI_INTEGRATION_SUMMARY.md](../AI_INTEGRATION_SUMMARY.md)** - Technical implementation details
+- **[../PHASE7_TESTING_SUMMARY.md](../PHASE7_TESTING_SUMMARY.md)** - Testing progress and results
+- **Architecture & Design** - Long-lived documentation in this folder
+- **Planning & Memory Bank** - Short-term planning in `../memory-bank/`
 
 ---
 
-*Last Updated: October 22, 2025*
+*Last Updated: November 5, 2025*
