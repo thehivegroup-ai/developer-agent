@@ -29,9 +29,13 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@types/axios": "^0.14.4",
     "@types/node": "^22.0.0",
+    "@types/node-fetch": "^2.6.13",
     "@types/pg": "^8.11.5",
     "@types/uuid": "^10.0.0",
+    "axios": "^1.13.2",
+    "node-fetch": "^3.3.2",
     "socket.io-client": "^4.8.1",
     "tsx": "^4.7.2",
     "typescript": "^5.4.5",
