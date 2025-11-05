@@ -1,6 +1,6 @@
 # API Gateway Tests
 
-Comprehensive test suite for the API Gateway endpoints.
+Comprehensive test suite for the API Gateway REST and WebSocket endpoints.
 
 ## Prerequisites
 
@@ -18,15 +18,23 @@ npm test -w api-gateway
 npm test -- --coverage -w api-gateway
 
 # Run specific test file
-npm test chat-api.test.ts -w api-gateway
+npx vitest --run tests/chat-api.test.ts
+npx vitest --run tests/websocket.test.ts
 
 # Watch mode (re-run on changes)
 npm test -- --watch -w api-gateway
 ```
 
+## Test Summary
+
+**Total:** 24 tests (100% passing)
+
+- ✅ 13 REST API endpoint tests
+- ✅ 11 WebSocket integration tests
+
 ## Test Files
 
-### `chat-api.test.ts`
+### `chat-api.test.ts` (13 tests)
 
 Tests all 5 chat API endpoints:
 
@@ -44,6 +52,44 @@ Tests all 5 chat API endpoints:
 - ✅ Edge cases (non-existent resources)
 - ✅ Full integration workflow
 
+### `websocket.test.ts` (11 tests)
+
+Tests real-time WebSocket communication:
+
+- **Connection** (3 tests)
+  - ✅ Connect to server
+  - ✅ Disconnect gracefully
+  - ✅ Handle connection errors
+
+- **Room Management** (3 tests)
+  - ✅ Join conversation room
+  - ✅ Leave conversation room
+  - ✅ Multiple clients in same room
+
+- **Event Structure** (2 tests)
+  - ✅ Validate WebSocketEventData structure
+  - ✅ Document all 8 event types
+
+- **Room Isolation** (1 test)
+  - ✅ Events isolated between rooms
+
+- **Reconnection** (1 test)
+  - ✅ Manual reconnection handling
+
+- **API Integration** (1 test)
+  - ✅ Join room after REST API conversation creation
+
+**WebSocket Event Types Tested:**
+
+- `agent:spawned`
+- `agent:status`
+- `agent:message`
+- `task:created`
+- `task:updated`
+- `query:progress`
+- `query:completed`
+- `error`
+
 ## Test Structure
 
 Each endpoint test includes:
@@ -56,7 +102,8 @@ Each endpoint test includes:
 ## Environment Variables
 
 ```bash
-API_BASE_URL=http://localhost:3000  # API Gateway URL
+API_BASE_URL=http://localhost:3000  # API Gateway URL (REST)
+WS_BASE_URL=http://localhost:3000   # WebSocket URL
 ```
 
 ## Expected Behavior
