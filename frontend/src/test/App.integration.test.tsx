@@ -26,14 +26,6 @@ vi.mock('socket.io-client', () => ({
 }));
 
 describe('App Integration Tests', () => {
-  // Helper to render and wait for async operations
-  const renderApp = async () => {
-    const result = render(<App />);
-    await waitFor(() => expect(axios.get).toHaveBeenCalled());
-    await waitFor(() => expect(axios.get).toHaveBeenCalled());
-    return result;
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
     // Set up logged-in state for all integration tests
