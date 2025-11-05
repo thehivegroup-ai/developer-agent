@@ -25,7 +25,7 @@ await fastify.register(queryRoutes);
 await fastify.register(chatRoutes);
 
 // Health check route
-fastify.get('/health', async () => {
+fastify.get('/health', () => {
   return {
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -39,7 +39,7 @@ fastify.get('/health', async () => {
 });
 
 // Root route
-fastify.get('/', async () => {
+fastify.get('/', () => {
   return {
     name: 'A2A Multi-Agent System API',
     version: '0.1.0',
@@ -72,4 +72,4 @@ const start = async () => {
   }
 };
 
-start();
+void start();

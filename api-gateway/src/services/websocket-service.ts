@@ -58,7 +58,7 @@ export class WebSocketService {
         const { conversationId, username } = data;
 
         // Join the room
-        socket.join(conversationId);
+        void socket.join(conversationId);
 
         // Track the connection
         if (!this.connectedClients.has(conversationId)) {
@@ -78,7 +78,7 @@ export class WebSocketService {
       socket.on('leave:conversation', (data: { conversationId: string }) => {
         const { conversationId } = data;
 
-        socket.leave(conversationId);
+        void socket.leave(conversationId);
         this.connectedClients.get(conversationId)?.delete(socket.id);
 
         console.log(`👋 Client ${socket.id} left conversation ${conversationId}`);
