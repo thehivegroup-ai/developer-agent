@@ -67,7 +67,7 @@ export interface CreateConversationResponse {
 /**
  * Register chat routes
  */
-export function chatRoutes(fastify: FastifyInstance) {
+export async function chatRoutes(fastify: FastifyInstance) {
   /**
    * POST /api/chat/message
    * Send a message (query) to the agent system

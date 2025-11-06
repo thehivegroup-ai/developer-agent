@@ -12,12 +12,14 @@ Added a new `.temp/` directory for temporary scripts, test files, and experiment
 ### 1. ✅ Updated Documentation Standards
 
 **`.github/instructions/documentation.instructions.md`:**
+
 - Added `.temp/` directory section
 - Documented purpose: temporary scripts, test files, experiments
 - Specified it should be gitignored
 - Added examples of what belongs there vs. production locations
 
 **`.github/copilot-instructions.md`:**
+
 - Added critical rule about temporary files
 - Specified `.temp/` as the correct location
 - Prohibited temp files in root or `scripts/`
@@ -37,6 +39,7 @@ temp/
 ### 3. ✅ Created .temp Directory
 
 Created `.temp/` directory with comprehensive README explaining:
+
 - Purpose and usage
 - What belongs there
 - What doesn't belong there
@@ -46,12 +49,14 @@ Created `.temp/` directory with comprehensive README explaining:
 ### 4. ✅ Moved Temporary Files
 
 **From Root → .temp/:**
+
 - `test-chat-api.sh`
 - `test-e2e-integration.sh`
 - `test-websocket-client.mjs`
 - `test-websocket-client.py`
 
 **From scripts/ → .temp/:**
+
 - `test-csproj-detection.mjs`
 - `demo-openai.ts`
 
@@ -80,6 +85,7 @@ developer-agent/
 ## Rules Summary
 
 ### ✅ Use .temp/ For:
+
 - Temporary test scripts
 - Experimental code
 - One-off debugging scripts
@@ -87,6 +93,7 @@ developer-agent/
 - Scratch files
 
 ### ❌ Don't Use .temp/ For:
+
 - Production scripts → `scripts/`
 - Permanent tests → `tests/` directories
 - Documentation → `docs/` or `memory-bank/`
@@ -133,6 +140,7 @@ git add scripts/my-script.js
 ## Prevention Strategy
 
 This prevents:
+
 - ❌ Temporary files in root directory
 - ❌ Test/demo scripts mixed with production scripts
 - ❌ Accidental commits of experimental code

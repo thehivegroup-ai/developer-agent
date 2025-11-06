@@ -44,9 +44,9 @@ Phase 7 is now complete with comprehensive testing coverage and AI integration e
 - **Repository Analysis**: AI insights about code structure and technologies
 - **Conversation Memory**: Multi-turn interactions with context retention
 - **Interactive Demo**: `npm run demo:ai` showcases AI capabilities
-- **Comprehensive Documentation**: Full guide in `docs/OPENAI_INTEGRATION.md`
+- **Comprehensive Documentation**: Full guide in `docs/completed/OPENAI_INTEGRATION.md`
 
-See [AI_INTEGRATION_SUMMARY.md](../AI_INTEGRATION_SUMMARY.md) for technical details.
+See [AI_INTEGRATION_SUMMARY.md](./AI_INTEGRATION_SUMMARY.md) for technical details.
 
 ## Test Coverage
 

@@ -6,6 +6,7 @@ import { queryRoutes } from './routes/query.js';
 import { chatRoutes } from './routes/chat.js';
 import { websocketService } from './services/websocket-service.js';
 import { getAgentService } from './services/agent-service.js';
+import { testPgConnection } from '@developer-agent/shared';
 
 const fastify = Fastify({
   logger: {
@@ -20,9 +21,17 @@ await fastify.register(cors, {
 
 await fastify.register(websocket);
 
+// Test database connection before registering routes
+console.log('Testing database connection...');
+const dbConnected = await testPgConnection();
+if (!dbConnected) {
+  console.error('❌ Database connection failed. Exiting...');
+  process.exit(1);
+}
+
 // Register routes
-await fastify.register(queryRoutes);
 await fastify.register(chatRoutes);
+await fastify.register(queryRoutes);
 
 // Health check route
 fastify.get('/health', () => {
