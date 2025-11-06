@@ -4,6 +4,8 @@
 
 This roadmap outlines the development plan for completing the Developer Agent system from its current state (Phase 7 complete with basic AI integration) to a fully production-ready, AI-powered multi-agent system with advanced features.
 
+**MAJOR UPDATE (November 5, 2025):** Phase 7.5 inserted to convert from Orchestrator to True Agent-to-Agent (A2A) Architecture. Existing Phase 8-10 shifted to Phase 9-11.
+
 ## Current Status (November 5, 2025)
 
 ✅ **Phase 7 Complete (100%)**
@@ -13,30 +15,119 @@ This roadmap outlines the development plan for completing the Developer Agent sy
 - Query decomposition and response generation
 - Real-time WebSocket updates
 - Comprehensive documentation
+- Message infrastructure ready (MessageQueue, MessageRouter, MessagePersistence)
+
+**Architecture Note:** System currently uses **Orchestrator Pattern** (Developer Agent controls all agents). Phase 7.5 will convert to **True A2A** (autonomous agents collaborating peer-to-peer).
 
 ## Timeline Overview
 
 ```
-November 2025     December 2025     January 2026
-     |                  |                  |
-     v                  v                  v
-  Phase 8           Phase 9            Phase 10
-  AI Enhancement    Testing            Deployment
-  (3 weeks)         (1 week)           (2 weeks)
-     |                  |                  |
-     v                  v                  v
-  ├─Streaming      ├─Unit Tests      ├─Docker
-  ├─Functions      ├─Integration     ├─CI/CD
-  ├─Memory         ├─Performance     ├─Monitoring
-  ├─Multi-Model    ├─Cost Track      ├─Security
-  └─Caching        └─Load Tests      └─Production
+November 2025          December 2025          January 2026
+     |                       |                      |
+     v                       v                      v
+  Phase 7.5              Phase 9                Phase 10
+  A2A Conversion        AI Enhancement         Testing
+  (2-3 weeks)           (3 weeks)              (1 week)
+     |                       |                      |
+     v                       v                      v
+  ├─Supervisor          ├─Streaming           ├─Unit Tests
+  ├─Autonomous          ├─Functions           ├─Integration
+  ├─Collaboration       ├─Memory              ├─Performance
+  ├─LangGraph           ├─Multi-Model         ├─Cost Track
+  └─Monitoring          └─Caching             └─Load Tests
+
+                            |
+                            v
+                        Phase 11
+                        Deployment
+                        (2 weeks)
+                            |
+                            v
+                        ├─Docker
+                        ├─CI/CD
+                        ├─Monitoring
+                        ├─Security
+                        └─Production
 ```
 
-## Phase 8: Advanced AI Enhancement (Weeks 1-3)
+## Phase 7.5: Agent-to-Agent (A2A) Conversion (Weeks 1-3) **← NEW**
+
+**Duration:** 2-3 weeks  
+**Status:** Ready to Start  
+**Priority:** High (Strategic Architecture Evolution)  
+**Goal:** Convert from Orchestrator Pattern to True Agent-to-Agent Architecture
+
+### Why This Phase?
+
+Current system has all A2A infrastructure (80% aligned) but uses orchestrator behaviors:
+
+- ❌ Developer Agent controls all agents (bottleneck)
+- ❌ Agents are passive workers (wait to be called)
+- ❌ No parallelism (sequential execution)
+- ❌ No agent-to-agent collaboration
+
+**After Phase 7.5:**
+
+- ✅ Autonomous agents (initiate actions, not just react)
+- ✅ Peer-to-peer collaboration (agents message each other)
+- ✅ Supervisor pattern (Developer Agent observes, interrupts when needed)
+- ✅ Parallel execution (agents work simultaneously)
+
+### Week 1: Developer Agent + GitHub Agent
+
+**Deliverables:**
+
+- [ ] Convert Developer Agent: Orchestrator → Supervisor
+  - Change `coordinateAgents()` → `superviseCollaboration()`
+  - Remove direct agent method calls
+  - Add observer pattern (receive all messages)
+  - Add interruption mechanism
+- [ ] Make GitHub Agent autonomous
+  - Add message handling loop
+  - Initiate collaboration (message Repository Agents)
+  - Send status notifications to Developer Agent
+- [ ] Feature toggle implementation (`USE_A2A` flag)
+- [ ] Unit tests for both agents
+
+### Week 2: Repository Agent + Relationship Agent
+
+**Deliverables:**
+
+- [ ] Enable Repository Agent collaboration
+  - Add autonomous analysis loop
+  - Send dependencies to Relationship Agent (peer messaging)
+  - Remove synchronous return values
+- [ ] Make Relationship Agent autonomous
+  - Autonomous graph building
+  - Proactive notifications (graph updates, circular dependencies)
+  - Respond to agent queries (not just Developer Agent)
+- [ ] Integration tests for agent collaboration
+
+### Week 3: Workflow + Monitoring
+
+**Deliverables:**
+
+- [ ] Update LangGraph workflow for A2A
+  - State schema for autonomous agents
+  - Conditional edges (agents decide next steps)
+  - Checkpointing for interruption/resume
+- [ ] Add A2A monitoring
+  - Message flow visualization
+  - Agent autonomy rate
+  - Collaboration paths
+  - Interruption rate
+- [ ] Staging deployment with feature toggle
+- [ ] Final integration tests
+
+**Detailed Plan:** See `memory-bank/planning/PHASE7.5_A2A_CONVERSION_PLAN.md`
+
+---
+
+## Phase 9: Advanced AI Enhancement (Weeks 4-6) **← Formerly Phase 8**
 
 **Duration:** 2-3 weeks  
 **Status:** Planned  
-**Goal:** Transform basic AI integration into a sophisticated, production-ready intelligent system
+**Goal:** Transform basic AI integration into sophisticated, production-ready intelligent system
 
 ### Week 1: Real-Time & Tool Integration
 
