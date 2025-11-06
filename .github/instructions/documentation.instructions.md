@@ -46,6 +46,37 @@ repository-root/
 - `CONTRIBUTING.md` - Contribution guidelines (if needed)
 - Configuration files (`.gitignore`, `.env.template`, etc.)
 
+**Not Allowed in Root:**
+
+- Documentation files (use `docs/` or `memory-bank/`)
+- Temporary scripts or test files (use `.temp/`)
+- Build artifacts or generated files
+
+### `.temp/` Directory
+
+**Purpose:** Temporary scripts, test files, and experimental code  
+**Audience:** Internal development only  
+**Git Status:** Ignored (added to `.gitignore`)
+
+**Use for:**
+
+- Temporary test scripts (e.g., `test-*.js`, `demo-*.ts`)
+- Experimental code snippets
+- One-off debugging scripts
+- Scratch files for development
+
+**Do NOT use for:**
+
+- Production scripts (use `scripts/`)
+- Permanent test suites (use `tests/` or `__tests__/`)
+- Documentation (use `docs/` or `memory-bank/`)
+
+**Lifecycle:**
+
+- Create files as needed during development
+- Delete when no longer needed
+- Never commit to version control (gitignored)
+
 **README.md Must Include:**
 
 1. Project description and purpose
@@ -422,6 +453,44 @@ Before committing documentation:
 | **Active**     | Current, accurate, in active use    | `docs/` or `memory-bank/current/`           |
 | **Completed**  | Finished work, historical reference | `docs/completed/` or `memory-bank/archive/` |
 | **Deprecated** | Outdated, replaced by newer doc     | Any location, with link to replacement      |
+
+---
+
+## ⚠️ CRITICAL: Do NOT Create Markdown Files in Root
+
+**NEVER create new `.md` files in the root directory except:**
+
+- `README.md` (already exists)
+- `LICENSE.md` or `LICENSE` (if needed)
+- `CONTRIBUTING.md` (if needed)
+
+**All other documentation MUST go in:**
+
+- `docs/` - for stable, long-term documentation
+- `memory-bank/` - for active work and planning
+- Project-specific subdirectories if absolutely necessary
+
+**❌ Wrong (violates standards):**
+
+```
+/REORGANIZATION_COMPLETE.md
+/PROJECT_SUMMARY.md
+/IMPLEMENTATION_NOTES.md
+```
+
+**✅ Correct:**
+
+```
+/docs/completed/REORGANIZATION_COMPLETE.md
+/docs/PROJECT_SUMMARY.md
+/memory-bank/current/IMPLEMENTATION_NOTES.md
+```
+
+**If AI creates a file in root by mistake:**
+
+1. Immediately move it to the appropriate location
+2. Update the instruction file with better guidance
+3. Report the issue so instructions can be improved
 
 ---
 

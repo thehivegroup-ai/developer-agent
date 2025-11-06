@@ -10,23 +10,48 @@
 
 ### Root Directory Issues
 
+**Files to Move:**
+
+- ❌ `ARCHITECTURE.md` - Should be in docs/architecture/
 - ❌ `AI_INTEGRATION_SUMMARY.md` - Should be in docs/completed/
+- ❌ `AGENT_INTEGRATION_SUMMARY.md` - Should be in docs/completed/
 - ❌ `DEVELOPMENT_ROADMAP.md` - Should be in memory-bank/planning/
+- ❌ `IMPLEMENTATION_ROADMAP.md` - Should be in memory-bank/planning/
 - ❌ `PHASE7_TESTING_SUMMARY.md` - Should be in docs/completed/
+- ❌ `TEST_COMPLETION_REPORT.md` - Should be in docs/completed/
+- ❌ `WORKFLOW_IMPLEMENTATION_SUMMARY.md` - Should be in docs/completed/
+- ❌ `REORGANIZATION_COMPLETE.md` - Should be in docs/completed/
+- ❌ `SETUP_COMPLETE.md` - Should be in docs/completed/
+
+**Stays in Root:**
+
 - ✅ `README.md` - Correct location
 
 ### docs/ Directory Issues
 
-- ✅ `README.md` - Good index
+**Needs Reorganization:**
+
+- ✅ `README.md` - Good index (will update paths)
 - ❌ `OPENAI_INTEGRATION.md` - Should be in docs/completed/ (feature complete)
+- ❌ `PHASE1_PROGRESS.md` - Should be in docs/completed/
+- ❌ `PHASE6_COMPLETION.md` - Should be in docs/completed/
+- ❌ `PHASE6_ENHANCEMENTS.md` - Should be in docs/completed/
+- ❌ `PHASE7_TESTING_PROGRESS.md` - Should be in docs/completed/
 - ❌ `PHASE8_AI_ENHANCEMENT_PLAN.md` - Should be in memory-bank/planning/
 - ❌ `PHASE9_AI_TESTING_PLAN.md` - Should be in memory-bank/planning/
 - ❌ `PHASE10_DEPLOYMENT_PLAN.md` - Should be in memory-bank/planning/
-- ✅ `PHASE1_PROGRESS.md`, etc. - Should stay (historical)
+
+**Historical/Reference (stays in docs/):**
+
+- ✅ `CLEANUP_ANALYSIS.md` - Historical record
+- ✅ `MISSING_COMPONENTS.md` - Reference document
+- ✅ `PROJECT_INFO.md` - Reference document
+- ✅ `PHASE_STRUCTURE_UPDATE.md` - Historical record
+- ⚠️ `REORGANIZATION_PLAN.md` - This file (archive after execution)
 
 ### memory-bank/ Directory
 
-- ✅ `planning/` exists with some content
+- ✅ `planning/` exists with content
 - ❌ Missing `current/` directory
 - ❌ Missing `archive/` directory
 
@@ -47,6 +72,7 @@ mkdir -p docs/completed
 **From Root → memory-bank/planning/**
 
 - `DEVELOPMENT_ROADMAP.md`
+- `IMPLEMENTATION_ROADMAP.md`
 
 **From docs/ → memory-bank/planning/**
 
@@ -59,13 +85,20 @@ mkdir -p docs/completed
 **From Root → docs/completed/**
 
 - `AI_INTEGRATION_SUMMARY.md`
+- `AGENT_INTEGRATION_SUMMARY.md`
 - `PHASE7_TESTING_SUMMARY.md`
+- `TEST_COMPLETION_REPORT.md`
+- `WORKFLOW_IMPLEMENTATION_SUMMARY.md`
+- `REORGANIZATION_COMPLETE.md`
+- `SETUP_COMPLETE.md`
 
 **From docs/ → docs/completed/**
 
-- `OPENAI_INTEGRATION.md` (Phase 7 complete)
-- `PHASE6_COMPLETION.md` (if exists)
-- `PHASE6_ENHANCEMENTS.md` (if exists)
+- `OPENAI_INTEGRATION.md`
+- `PHASE1_PROGRESS.md`
+- `PHASE6_COMPLETION.md`
+- `PHASE6_ENHANCEMENTS.md`
+- `PHASE7_TESTING_PROGRESS.md`
 
 ### Step 4: Organize Requirements
 
@@ -77,10 +110,14 @@ mkdir -p docs/completed
 
 ### Step 5: Organize Architecture
 
-**From docs/ → docs/architecture/**
+**From Root → docs/architecture/**
 
-- `ARCHITECTURE.md` (if exists)
-- Create new: `agent-communication-protocol.md` (extract from memory-bank)
+- `ARCHITECTURE.md`
+
+**From memory-bank/planning/ → docs/architecture/**
+
+- `agent-communication-protocol.md`
+- `langgraph-state-schema.md`
 
 ### Step 6: Archive Old Memory Bank Content
 
@@ -113,41 +150,58 @@ mkdir -p docs/completed
 
 ## Proposed New Structure
 
-```
+```text
 developer-agent/
 ├── README.md                                    # What, build, test, run
-├── DOCUMENTATION_STANDARDS.md                   # This standards guide
 ├──
 ├── docs/
 │   ├── README.md                               # Documentation index
+│   │
 │   ├── requirements/
 │   │   ├── initial-requirements.md
 │   │   ├── api-contracts.md
 │   │   └── database-schemas.md
+│   │
 │   ├── architecture/
 │   │   ├── ARCHITECTURE.md
 │   │   ├── agent-communication-protocol.md
 │   │   └── langgraph-state-schema.md
-│   └── completed/
-│       ├── PHASE1_PROGRESS.md
-│       ├── PHASE6_COMPLETION.md
-│       ├── PHASE6_ENHANCEMENTS.md
-│       ├── PHASE7_TESTING_SUMMARY.md
-│       ├── AI_INTEGRATION_SUMMARY.md
-│       └── OPENAI_INTEGRATION.md
+│   │
+│   ├── completed/
+│   │   ├── AI_INTEGRATION_SUMMARY.md
+│   │   ├── AGENT_INTEGRATION_SUMMARY.md
+│   │   ├── OPENAI_INTEGRATION.md
+│   │   ├── PHASE1_PROGRESS.md
+│   │   ├── PHASE6_COMPLETION.md
+│   │   ├── PHASE6_ENHANCEMENTS.md
+│   │   ├── PHASE7_TESTING_PROGRESS.md
+│   │   ├── PHASE7_TESTING_SUMMARY.md
+│   │   ├── REORGANIZATION_COMPLETE.md
+│   │   ├── SETUP_COMPLETE.md
+│   │   ├── TEST_COMPLETION_REPORT.md
+│   │   └── WORKFLOW_IMPLEMENTATION_SUMMARY.md
+│   │
+│   └── (reference docs stay in docs/)
+│       ├── CLEANUP_ANALYSIS.md
+│       ├── MISSING_COMPONENTS.md
+│       ├── PHASE_STRUCTURE_UPDATE.md
+│       └── PROJECT_INFO.md
 │
 └── memory-bank/
     ├── README.md                               # Purpose and usage
+    │
     ├── planning/
     │   ├── DEVELOPMENT_ROADMAP.md
+    │   ├── IMPLEMENTATION_ROADMAP.md
     │   ├── PHASE8_AI_ENHANCEMENT_PLAN.md
     │   ├── PHASE9_AI_TESTING_PLAN.md
     │   └── PHASE10_DEPLOYMENT_PLAN.md
+    │
     ├── current/
     │   └── (empty - ready for Phase 8 work)
+    │
     └── archive/
-        ├── development-phases.md
-        └── (other completed planning docs)
+        └── development-phases.md
 ```
 
 ## Execution Commands
@@ -160,32 +214,45 @@ mkdir -p docs/requirements
 mkdir -p docs/architecture
 mkdir -p docs/completed
 
-# Step 2: Move planning docs
+# Step 2: Move planning docs from root
 git mv DEVELOPMENT_ROADMAP.md memory-bank/planning/
+git mv IMPLEMENTATION_ROADMAP.md memory-bank/planning/
+
+# Step 2b: Move planning docs from docs/
 git mv docs/PHASE8_AI_ENHANCEMENT_PLAN.md memory-bank/planning/
 git mv docs/PHASE9_AI_TESTING_PLAN.md memory-bank/planning/
 git mv docs/PHASE10_DEPLOYMENT_PLAN.md memory-bank/planning/
 
-# Step 3: Move completed docs
+# Step 3: Move completed docs from root
 git mv AI_INTEGRATION_SUMMARY.md docs/completed/
+git mv AGENT_INTEGRATION_SUMMARY.md docs/completed/
 git mv PHASE7_TESTING_SUMMARY.md docs/completed/
+git mv TEST_COMPLETION_REPORT.md docs/completed/
+git mv WORKFLOW_IMPLEMENTATION_SUMMARY.md docs/completed/
+git mv REORGANIZATION_COMPLETE.md docs/completed/
+git mv SETUP_COMPLETE.md docs/completed/
+
+# Step 3b: Move completed docs from docs/
 git mv docs/OPENAI_INTEGRATION.md docs/completed/
-git mv docs/PHASE6_COMPLETION.md docs/completed/ 2>/dev/null || true
-git mv docs/PHASE6_ENHANCEMENTS.md docs/completed/ 2>/dev/null || true
-git mv docs/PHASE1_PROGRESS.md docs/completed/ 2>/dev/null || true
+git mv docs/PHASE1_PROGRESS.md docs/completed/
+git mv docs/PHASE6_COMPLETION.md docs/completed/
+git mv docs/PHASE6_ENHANCEMENTS.md docs/completed/
+git mv docs/PHASE7_TESTING_PROGRESS.md docs/completed/
 
 # Step 4: Move requirements
-git mv memory-bank/planning/initial-requirements.md docs/requirements/ 2>/dev/null || true
-git mv memory-bank/planning/api-contracts.md docs/requirements/ 2>/dev/null || true
-git mv memory-bank/planning/database-schemas.md docs/requirements/ 2>/dev/null || true
+git mv memory-bank/planning/initial-requirements.md docs/requirements/
+git mv memory-bank/planning/api-contracts.md docs/requirements/
+git mv memory-bank/planning/database-schemas.md docs/requirements/
 
-# Step 5: Move architecture
-git mv docs/ARCHITECTURE.md docs/architecture/ 2>/dev/null || true
-git mv memory-bank/planning/agent-communication-protocol.md docs/architecture/ 2>/dev/null || true
-git mv memory-bank/planning/langgraph-state-schema.md docs/architecture/ 2>/dev/null || true
+# Step 5: Move architecture from root
+git mv ARCHITECTURE.md docs/architecture/
+
+# Step 5b: Move architecture from memory-bank
+git mv memory-bank/planning/agent-communication-protocol.md docs/architecture/
+git mv memory-bank/planning/langgraph-state-schema.md docs/architecture/
 
 # Step 6: Archive old planning
-git mv memory-bank/planning/development-phases.md memory-bank/archive/ 2>/dev/null || true
+git mv memory-bank/planning/development-phases.md memory-bank/archive/
 ```
 
 ## Files to Update After Reorganization
@@ -238,28 +305,50 @@ git add docs/requirements docs/architecture docs/completed
 git commit -m "docs: create new documentation directory structure"
 
 # Commit 2: Move planning docs
-git add memory-bank/planning/
+git add memory-bank/planning/DEVELOPMENT_ROADMAP.md
+git add memory-bank/planning/IMPLEMENTATION_ROADMAP.md
+git add memory-bank/planning/PHASE8_AI_ENHANCEMENT_PLAN.md
+git add memory-bank/planning/PHASE9_AI_TESTING_PLAN.md
+git add memory-bank/planning/PHASE10_DEPLOYMENT_PLAN.md
 git commit -m "docs: move planning documents to memory-bank/planning/"
 
-# Commit 3: Move completed docs
-git add docs/completed/
+# Commit 3: Move completed docs from root
+git add docs/completed/AI_INTEGRATION_SUMMARY.md
+git add docs/completed/AGENT_INTEGRATION_SUMMARY.md
+git add docs/completed/PHASE7_TESTING_SUMMARY.md
+git add docs/completed/TEST_COMPLETION_REPORT.md
+git add docs/completed/WORKFLOW_IMPLEMENTATION_SUMMARY.md
+git add docs/completed/REORGANIZATION_COMPLETE.md
+git add docs/completed/SETUP_COMPLETE.md
+git commit -m "docs: move completed summaries from root to docs/completed/"
+
+# Commit 4: Move completed phase docs
+git add docs/completed/OPENAI_INTEGRATION.md
+git add docs/completed/PHASE1_PROGRESS.md
+git add docs/completed/PHASE6_COMPLETION.md
+git add docs/completed/PHASE6_ENHANCEMENTS.md
+git add docs/completed/PHASE7_TESTING_PROGRESS.md
 git commit -m "docs: move completed phase docs to docs/completed/"
 
-# Commit 4: Move requirements
+# Commit 5: Move requirements
 git add docs/requirements/
 git commit -m "docs: move requirements to docs/requirements/"
 
-# Commit 5: Move architecture
+# Commit 6: Move architecture
 git add docs/architecture/
 git commit -m "docs: move architecture docs to docs/architecture/"
 
-# Commit 6: Update READMEs
+# Commit 7: Archive old planning
+git add memory-bank/archive/
+git commit -m "docs: archive completed planning documents"
+
+# Commit 8: Update READMEs
 git add README.md docs/README.md memory-bank/README.md
 git commit -m "docs: update README files with new structure"
 
-# Commit 7: Add standards
-git add DOCUMENTATION_STANDARDS.md
-git commit -m "docs: add documentation organization standards"
+# Commit 9: Archive this reorganization plan
+git mv docs/REORGANIZATION_PLAN.md memory-bank/archive/
+git commit -m "docs: archive reorganization plan after execution"
 ```
 
 ## Timeline

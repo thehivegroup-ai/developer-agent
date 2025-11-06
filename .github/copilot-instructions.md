@@ -28,3 +28,26 @@ This document defines **HOW** to work with this repository type. For project-spe
 - `.github/instructions/security.instructions.md` - Security best practices
 
 **These instruction files are automatically applied to relevant file types.**
+
+## ⚠️ CRITICAL RULE: Root Directory
+
+**NEVER create new `.md` files in the root directory.**
+
+Root should only contain:
+
+- `README.md` (already exists - update, don't replace)
+- `LICENSE` or `LICENSE.md` (if needed)
+- `CONTRIBUTING.md` (if needed)
+- Configuration files (`.gitignore`, `.env.template`, `package.json`, etc.)
+
+**All documentation MUST go in:**
+
+- `docs/` - stable, long-term documentation
+- `memory-bank/` - active work and planning
+
+**All temporary/test scripts MUST go in:**
+
+- `.temp/` - temporary test scripts, experiments, scratch files (gitignored)
+- NOT in root or `scripts/` directory
+
+See `.github/instructions/documentation.instructions.md` for complete rules.
