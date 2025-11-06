@@ -316,6 +316,27 @@ export class AgentCardTemplates {
         ],
       })
       .addSkill({
+        id: 'discover-repository',
+        name: 'Discover Repository',
+        description:
+          'Discovers and retrieves detailed information about a specific GitHub repository. ' +
+          'Returns metadata including URL, description, languages, and basic structure.',
+      })
+      .addSkill({
+        id: 'analyze-repository',
+        name: 'Analyze Repository',
+        description:
+          'Performs deep analysis of a GitHub repository. ' +
+          'Extracts code structure, dependencies, and architectural patterns.',
+      })
+      .addSkill({
+        id: 'detect-repository-type',
+        name: 'Detect Repository Type',
+        description:
+          'Detects the type and technology stack of a repository. ' +
+          'Identifies frameworks, languages, and project structure.',
+      })
+      .addSkill({
         id: 'extract-metadata',
         name: 'Extract Repository Metadata',
         description:
