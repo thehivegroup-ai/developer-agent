@@ -8,6 +8,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "a2a": "tsx src/a2a-server.ts",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "lint": "eslint src/**/*.ts"

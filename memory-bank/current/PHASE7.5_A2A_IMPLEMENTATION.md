@@ -13,8 +13,8 @@ Implementing full A2A (Agent-to-Agent) Protocol v0.3.0 compliance for all agents
 1. ✅ Build core A2A infrastructure (types, transport, task management)
 2. ✅ Add HTTP endpoints to Developer Agent with full A2A compliance
 3. ✅ Add HTTP endpoints to GitHub Agent
-4. ⏳ Add HTTP endpoints to Repository Agents
-5. ⏳ Add HTTP endpoints to Relationship Agent
+4. ✅ Add HTTP endpoints to Repository Agents
+5. ✅ Add HTTP endpoints to Relationship Agent
 6. ⏳ Implement A2A HTTP client for inter-agent communication
 7. ⏳ Add comprehensive testing and security
 
@@ -170,15 +170,41 @@ Each agent implements:
     - Agent Card should list analysis capabilities per language
     - May need routing logic to delegate to appropriate agent type
 
-- [ ] **Task 8:** Add HTTP server infrastructure to Relationship Agent
-  - **Status:** Not Started
-  - **Files:** `relationship-agent/src/a2a-server.ts` (to be created)
+- [x] **Task 8:** Add HTTP server infrastructure to Relationship Agent
+  - **Status:** ✅ FULLY COMPLETE - All tests passing (24/24)
+  - **Completed:** 2025-11-05
+  - **Files:**
+    - `relationship-agent/src/a2a-server.ts` (326 lines)
+    - `relationship-agent/tests/a2a-server.test.ts` (426 lines, 24 tests)
+    - `shared/src/a2a/AgentCardBuilder.ts` (updated Relationship Agent skills)
   - **Port:** 3004
-  - **Dependencies:** Task 6
-  - **Notes:**
-    - Knowledge graph building skills
-    - Cross-repository relationship analysis
-    - May need Neo4j connection info in Agent Card
+  - **Details:**
+    - RelationshipAgentA2AServer class wrapping existing BaseRelationshipAgent
+    - RelationshipAgentImpl extends BaseRelationshipAgent, implements BaseAgent abstract methods
+    - Implements 3 A2A RPC methods: message/send, tasks/get, tasks/cancel
+    - Message parsing for relationship operations:
+      - `build graph: <analysisResults>`
+      - `analyze relationships: <query>`
+      - `find connections: <entity1> -> <entity2>`
+      - `track dependency: <package>`
+    - Agent Card published at `/.well-known/agent-card.json` with 2 skills
+    - Standalone execution with graceful shutdown (SIGINT/SIGTERM handlers)
+    - Added npm script: `"a2a": "tsx src/a2a-server.ts"`
+  - **Key Implementation Notes:**
+    - Fixed imports: JsonRpcTransport (not JsonRpcTransportImpl), A2AErrorCode (singular)
+    - Implemented abstract methods: init(), handleRequest(), shutdown() from BaseAgent
+    - Used main() function pattern (not top-level await) for reliable startup
+    - Fixed test RPC_URL to use root path (not `/rpc`)
+    - Fixed Agent Card test to use `transports` (plural array) not `transport` (singular)
+  - **Testing:**
+    - **Status:** ✅ 24/24 tests passing (100%)
+    - **Test Suites (all passing):**
+      1. Health and Discovery (4 tests): health endpoint, Agent Card serving, skills validation, transports array check
+      2. JSON-RPC Protocol (5 tests): valid requests, protocol violations, malformed JSON, unknown methods
+      3. Task Management (5 tests): create/retrieve/cancel tasks, task status tracking, non-existent task handling
+      4. Message Handling (6 tests): 4 operation types (build graph, analyze relationships, find connections, track dependency), empty parts rejection, multiple text parts
+      5. Error Handling (2 tests): invalid params, task continuation with taskId
+      6. CORS and Headers (2 tests): CORS headers presence, OPTIONS preflight handling
 
 ### Phase 3: Inter-Agent Communication
 
