@@ -38,7 +38,7 @@ beforeAll(async () => {
 
   const { spawn } = await import('child_process');
   const isWindows = process.platform === 'win32';
-  
+
   // Use npx tsx directly instead of npm run to avoid Windows spawn issues
   serverProcess = spawn(isWindows ? 'npx.cmd' : 'npx', ['tsx', 'src/a2a-server.ts'], {
     cwd: process.cwd(),

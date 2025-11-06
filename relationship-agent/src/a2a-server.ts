@@ -138,7 +138,10 @@ export class RelationshipAgentA2AServer {
    */
   private async handleMessageSend(params: MessageSendParams): Promise<MessageSendResult> {
     if (this.config.enableLogging) {
-      console.log('[RelationshipAgent A2A] message/send received:', JSON.stringify(params, null, 2));
+      console.log(
+        '[RelationshipAgent A2A] message/send received:',
+        JSON.stringify(params, null, 2)
+      );
     }
 
     const { message, taskId } = params;
@@ -278,7 +281,10 @@ export class RelationshipAgentA2AServer {
    */
   private async handleTasksCancel(params: TasksCancelParams): Promise<TasksCancelResult> {
     if (this.config.enableLogging) {
-      console.log('[RelationshipAgent A2A] tasks/cancel received:', JSON.stringify(params, null, 2));
+      console.log(
+        '[RelationshipAgent A2A] tasks/cancel received:',
+        JSON.stringify(params, null, 2)
+      );
     }
 
     const task = await this.taskManager.cancelTask(params.taskId, params.reason);

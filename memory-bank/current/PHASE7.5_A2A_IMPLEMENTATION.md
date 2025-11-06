@@ -158,13 +158,13 @@ Each agent implements:
     - **Status:** ✅ **FULLY COMPLETE - 24/24 tests passing (100%)**
     - Test file: `repository-agents/tests/a2a-server.test.ts` (426 lines)
     - Test Results:
-      * ✅ Health and Discovery: 4/4 tests passing
-      * ✅ JSON-RPC Protocol: 5/5 tests passing
-      * ✅ Task Management: 5/5 tests passing
-      * ✅ Message Handling: 6/6 tests passing
-      * ✅ Error Handling: 2/2 tests passing
-      * ✅ CORS and Headers: 2/2 tests passing
-      * **Final: 24/24 tests passing (100%)** ✅
+      - ✅ Health and Discovery: 4/4 tests passing
+      - ✅ JSON-RPC Protocol: 5/5 tests passing
+      - ✅ Task Management: 5/5 tests passing
+      - ✅ Message Handling: 6/6 tests passing
+      - ✅ Error Handling: 2/2 tests passing
+      - ✅ CORS and Headers: 2/2 tests passing
+      - **Final: 24/24 tests passing (100%)** ✅
     - Duration: 6.03s test execution
     - Pattern: Same comprehensive testing as GitHub Agent
     - Agent Card should list analysis capabilities per language

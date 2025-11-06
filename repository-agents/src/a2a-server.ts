@@ -223,10 +223,7 @@ export class RepositoryAgentsA2AServer {
    */
   private async handleTasksGet(params: TasksGetParams): Promise<TasksGetResult> {
     if (this.config.enableLogging) {
-      console.log(
-        '[Repository Agents A2A] tasks/get received:',
-        JSON.stringify(params, null, 2)
-      );
+      console.log('[Repository Agents A2A] tasks/get received:', JSON.stringify(params, null, 2));
     }
 
     const task = await this.taskManager.getTask(params.taskId);
@@ -265,7 +262,8 @@ export class RepositoryAgentsA2AServer {
     const lowerMessage = message.toLowerCase().trim();
 
     // Pattern: "analyze repository: owner/repo" or "analyze: owner/repo"
-    const analyzePattern = /^analyze(?:\s+repository)?:\s*([^/\s]+)\/([^\s]+)(?:\s+branch:\s*(\S+))?/;
+    const analyzePattern =
+      /^analyze(?:\s+repository)?:\s*([^/\s]+)\/([^\s]+)(?:\s+branch:\s*(\S+))?/;
     const analyzeMatch = analyzePattern.exec(lowerMessage);
     if (analyzeMatch) {
       return {
@@ -277,7 +275,8 @@ export class RepositoryAgentsA2AServer {
     }
 
     // Pattern: "extract endpoints: owner/repo" or "endpoints: owner/repo"
-    const endpointsPattern = /^(?:extract\s+)?endpoints:\s*([^/\s]+)\/([^\s]+)(?:\s+branch:\s*(\S+))?/;
+    const endpointsPattern =
+      /^(?:extract\s+)?endpoints:\s*([^/\s]+)\/([^\s]+)(?:\s+branch:\s*(\S+))?/;
     const endpointsMatch = endpointsPattern.exec(lowerMessage);
     if (endpointsMatch) {
       return {
@@ -299,7 +298,8 @@ export class RepositoryAgentsA2AServer {
     }
 
     // Pattern: "detect type: owner/repo" or "repository type: owner/repo"
-    const typePattern = /^(?:detect\s+type|repository\s+type):\s*([^/\s]+)\/([^\s]+)(?:\s+branch:\s*(\S+))?/;
+    const typePattern =
+      /^(?:detect\s+type|repository\s+type):\s*([^/\s]+)\/([^\s]+)(?:\s+branch:\s*(\S+))?/;
     const typeMatch = typePattern.exec(lowerMessage);
     if (typeMatch) {
       return {
