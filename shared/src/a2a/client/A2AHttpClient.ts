@@ -146,11 +146,7 @@ export class A2AHttpClient {
    * @returns Canceled task information
    */
   async cancelTask(baseUrl: string, params: TasksCancelParams): Promise<TasksCancelResult> {
-    return this.rpcRequest<TasksCancelParams, TasksCancelResult>(
-      baseUrl,
-      'tasks/cancel',
-      params
-    );
+    return this.rpcRequest<TasksCancelParams, TasksCancelResult>(baseUrl, 'tasks/cancel', params);
   }
 
   /**
@@ -245,10 +241,7 @@ export class A2AHttpClient {
     };
 
     if (this.config.debug) {
-      console.log(
-        `[A2AHttpClient] RPC Request to ${baseUrl}:`,
-        JSON.stringify(request, null, 2)
-      );
+      console.log(`[A2AHttpClient] RPC Request to ${baseUrl}:`, JSON.stringify(request, null, 2));
     }
 
     const response = await this.fetchWithRetry(baseUrl, {
@@ -281,9 +274,7 @@ export class A2AHttpClient {
 
     // Validate response ID matches request
     if (rpcResponse.id !== requestId) {
-      throw new Error(
-        `RPC response ID mismatch: expected ${requestId}, got ${rpcResponse.id}`
-      );
+      throw new Error(`RPC response ID mismatch: expected ${requestId}, got ${rpcResponse.id}`);
     }
 
     // Type guard: at this point we know it's a success response
