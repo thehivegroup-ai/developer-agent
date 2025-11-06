@@ -94,6 +94,22 @@ npm run db:seed
 
 ### 5. Start Development Servers
 
+**Option 1 - Start All Services (Recommended):**
+
+```bash
+npm run start:all
+```
+
+This starts all services concurrently in a single terminal:
+- 🔵 API Gateway (Backend): http://localhost:3000
+- 🟣 Frontend (React): http://localhost:5173
+- 🟢 Developer Agent Service
+- 🟡 GitHub Agent Service
+- 🔵 Relationship Agent Service (Neo4j Knowledge Graph)
+- 🔴 Repository Agents Service (Code Analysis)
+
+**Option 2 - Start Services Individually:**
+
 **Terminal 1 - Backend API:**
 
 ```bash
@@ -197,14 +213,30 @@ developer-agent/
 ### Development
 
 ```bash
-# Start API Gateway
+# Start all services (API Gateway, Frontend, Agents)
+npm run start:all
+
+# Start API Gateway only
 cd api-gateway && npm run dev
 
-# Start Frontend
+# Start Frontend only
 cd frontend && npm run dev
 
 # Build all packages
 npm run build
+```
+
+### Database
+
+```bash
+# Setup database (run migrations)
+npm run db:migrate
+
+# Seed database with test data
+npm run db:seed
+
+# Reset database (drop all tables and recreate)
+npm run db:reset
 ```
 
 ### Testing

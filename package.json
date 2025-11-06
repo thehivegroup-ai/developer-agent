@@ -15,6 +15,7 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
+    "start:all": "concurrently -n \"api,frontend,dev-agent,gh-agent,rel-agent,repo-agent\" -c \"bgBlue.bold,bgMagenta.bold,bgGreen.bold,bgYellow.bold,bgCyan.bold,bgRed.bold\" \"npm run dev -w api-gateway\" \"npm run dev -w frontend\" \"npm run dev -w developer-agent\" \"npm run dev -w github-agent\" \"npm run dev -w relationship-agent\" \"npm run dev -w repository-agents\"",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "test:watch": "npm run test:watch --workspaces --if-present",
@@ -31,6 +32,7 @@
     "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
+    "concurrently": "^9.2.1",
     "eslint": "^8.57.0",
     "prettier": "^3.2.5",
     "tsx": "^4.7.2",
