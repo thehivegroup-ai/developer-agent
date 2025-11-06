@@ -41,6 +41,181 @@ export class GitHubAgent extends BaseGitHubAgent {
     console.log('✅ GitHub Agent initialized');
   }
 
+  /**
+   * Handle incoming messages (A2A Pattern - Autonomous)
+   * Process requests autonomously and initiate collaboration with other agents
+   */
+  override async handleMessage(message: AgentMessage): Promise<AgentMessage | null> {
+    const params = message.content.parameters;
+    const action = message.content.action;
+
+    this.log('info', 'GitHub Agent received message', {
+      from: message.from,
+      action,
+      taskId: params?.taskId,
+    });
+
+    if (message.messageType === 'request' && action === 'discover') {
+      return await this.processSearchRequest(message);
+    }
+
+    if (message.messageType === 'command' && action === 'cancel') {
+      return await this.processCancelCommand(message);
+    }
+
+    return null;
+  }
+
+  /**
+   * Process search request autonomously
+   * Discover repositories and initiate collaboration with Repository Agents
+   */
+  private async processSearchRequest(message: AgentMessage): Promise<AgentMessage> {
+    const params = message.content.parameters as Record<string, unknown>;
+    const query = params?.query as string;
+    const taskId = params?.taskId as string;
+    const limit = (params?.limit as number) || 5;
+
+    // Notify supervisor: starting work
+    this.sendNotification(message.from, 'started', taskId, {
+      action: 'discover',
+      query,
+    });
+
+    try {
+      // Discover repositories
+      const result = await this.discoverRepositories(query, limit);
+
+      if (result.repositories && result.repositories.length > 0) {
+        this.log('info', 'Discovered repositories', {
+          count: result.repositories.length,
+          taskId,
+        });
+
+        // Autonomously initiate collaboration with Repository Agents
+        // (In full implementation, would send messages to Repository Agents here)
+        // For now, just notify supervisor of completion
+
+        // Store results in message
+        const responseMessage: AgentMessage = {
+          id: this.generateMessageId(),
+          from: this.agentId,
+          to: message.from,
+          messageType: 'response',
+          content: {
+            action: 'discover',
+            data: result,
+            parameters: { taskId },
+          },
+          timestamp: new Date(),
+          priority: 'normal',
+        };
+
+        // Notify supervisor: completed
+        this.sendNotification(message.from, 'completed', taskId, {
+          repositoryCount: result.repositories.length,
+          repositories: result.repositories.map((r) => r.fullName),
+        });
+
+        return responseMessage;
+      } else {
+        // No repositories found
+        this.sendNotification(message.from, 'completed', taskId, {
+          repositoryCount: 0,
+          warning: 'No repositories found',
+        });
+
+        return {
+          id: this.generateMessageId(),
+          from: this.agentId,
+          to: message.from,
+          messageType: 'response',
+          content: {
+            action: 'discover',
+            data: { repositories: [] },
+            parameters: { taskId },
+          },
+          timestamp: new Date(),
+          priority: 'normal',
+        };
+      }
+    } catch (error) {
+      this.log('error', 'Failed to discover repositories', { error, taskId });
+
+      // Notify supervisor: failed
+      this.sendNotification(message.from, 'failed', taskId, {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+
+      return {
+        id: this.generateMessageId(),
+        from: this.agentId,
+        to: message.from,
+        messageType: 'error',
+        content: {
+          action: 'discover',
+          error: {
+            code: 'DISCOVERY_FAILED',
+            message: error instanceof Error ? error.message : 'Unknown error',
+            recoverable: true,
+          },
+          parameters: { taskId },
+        },
+        timestamp: new Date(),
+        priority: 'normal',
+      };
+    }
+  }
+
+  /**
+   * Process cancel command from supervisor
+   */
+  private async processCancelCommand(message: AgentMessage): Promise<AgentMessage> {
+    const params = message.content.parameters as Record<string, unknown>;
+    const taskId = params?.taskId as string;
+    const reason = params?.reason as string;
+
+    this.log('warn', 'GitHub Agent received cancel command', { taskId, reason });
+
+    // Cancel any ongoing operations (placeholder for now)
+    // In a real implementation, would cancel API requests, cleanup resources, etc.
+
+    return {
+      id: this.generateMessageId(),
+      from: this.agentId,
+      to: message.from,
+      messageType: 'response',
+      content: {
+        action: 'cancel',
+        data: { success: true, cancelled: true },
+        parameters: { taskId },
+      },
+      timestamp: new Date(),
+      priority: 'normal',
+    };
+  }
+
+  /**
+   * Send status notification to supervisor
+   */
+  private sendNotification(
+    to: string,
+    status: string,
+    taskId: string,
+    details?: Record<string, unknown>
+  ): void {
+    // Note: In a real implementation, would use MessageRouter to send
+    // For now, this is a placeholder showing the A2A pattern
+    this.log('info', 'Sending notification', { to, status, taskId, details });
+  }
+
+  /**
+   * Generate unique message ID
+   */
+  private generateMessageId(): string {
+    return `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
   override async handleRequest(request: unknown): Promise<unknown> {
     const req = request as RepositoryDiscoveryRequest;
 
@@ -340,67 +515,5 @@ export class GitHubAgent extends BaseGitHubAgent {
     } catch (error) {
       console.error('Error checking rate limit:', error);
     }
-  }
-
-  /**
-   * Handle incoming agent messages
-   */
-  override async handleMessage(message: AgentMessage): Promise<AgentMessage | null> {
-    const action = message.content.action;
-
-    if (!action) {
-      return this.createErrorResponse(message, 'NO_ACTION', 'Message does not contain an action');
-    }
-
-    try {
-      const result = await this.handleRequest(message.content.parameters || {});
-
-      return {
-        id: `response-${Date.now()}`,
-        timestamp: new Date(),
-        from: 'github-agent',
-        to: message.from,
-        messageType: 'response',
-        content: {
-          data: result,
-        },
-        parentMessageId: message.id,
-        conversationId: message.conversationId,
-        priority: message.priority,
-      };
-    } catch (error) {
-      return this.createErrorResponse(
-        message,
-        'HANDLER_ERROR',
-        error instanceof Error ? error.message : 'Unknown error'
-      );
-    }
-  }
-
-  /**
-   * Create error response message
-   */
-  protected override createErrorResponse(
-    originalMessage: AgentMessage,
-    code: string,
-    message: string
-  ): AgentMessage {
-    return {
-      id: `error-${Date.now()}`,
-      timestamp: new Date(),
-      from: 'github-agent',
-      to: originalMessage.from,
-      messageType: 'error',
-      content: {
-        error: {
-          code,
-          message,
-          recoverable: true,
-        },
-      },
-      parentMessageId: originalMessage.id,
-      conversationId: originalMessage.conversationId,
-      priority: originalMessage.priority,
-    };
   }
 }

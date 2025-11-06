@@ -1,558 +1,666 @@
-# Phase 7.5: Agent-to-Agent (A2A) Conversion Plan
+# Phase 7.5: A2A Protocol Compliance Implementation
 
 **Status:** Planning - Ready for Implementation  
 **Date:** November 5, 2025  
-**Duration:** 2-3 weeks  
-**Priority:** High (Strategic Architecture Evolution)
+**Duration:** 4-6 weeks  
+**Priority:** High (Strategic Architecture Evolution)  
+**Protocol Version:** A2A v0.3.0 (https://a2a-protocol.org/latest/specification/)
 
 ## Overview
 
-This phase converts the system from an **Orchestrator Pattern** (central coordinator controlling all agents) to **True Agent-to-Agent (A2A) Architecture** (autonomous agents collaborating peer-to-peer). All infrastructure is complete; this phase changes agent _behaviors_ from passive workers to autonomous collaborators.
+This phase implements **full A2A protocol compliance** according to the official Agent-to-Agent Protocol specification. Our agents will become first-class A2A-compliant agents that can:
 
-## Current State (Orchestrator Pattern)
+1. **Expose HTTP endpoints** for external agent discovery and communication
+2. **Publish Agent Cards** at `.well-known/agent-card.json` with capabilities and skills
+3. **Implement JSON-RPC 2.0 methods** (`message/send`, `tasks/get`, `tasks/cancel`, etc.)
+4. **Manage stateful Tasks** with proper lifecycle (submitted → working → completed)
+5. **Communicate via standard A2A Messages** with roles, parts, and artifacts
+6. **Be discovered by external agents** and collaborate across organizational boundaries
 
-**What We Have:**
+**Key Difference from Original Plan:**  
+Original Plan: Internal message-based architecture (supervisor pattern)  
+**New Plan: Full A2A protocol compliance** (HTTP endpoints, Agent Cards, JSON-RPC, external interoperability)
 
-- ✅ Message infrastructure (MessageQueue, MessageRouter, MessagePersistence)
-- ✅ BaseAgent with handleMessage() method
-- ✅ LangGraph workflow system
-- ✅ 4 specialized agents (Developer, GitHub, Repository, Relationship)
-- ✅ All tests passing (153 tests)
-- ✅ Complete database schemas (PostgreSQL, Neo4j)
+## Current State Analysis
 
-**Current Behavior:**
+### What We Have (NOT A2A Compliant)
+
+**Our Internal System:**
+
+- ✅ Internal message bus (MessageQueue, MessageRouter, MessagePersistence)
+- ✅ Custom agent types (Developer, GitHub, Repository, Relationship)
+- ✅ Internal handleMessage() method (not A2A standard)
+- ✅ Custom message format (AgentMessage type)
+- ✅ No HTTP endpoints exposed
+- ✅ No Agent Cards published
+- ✅ No external discovery mechanism
+- ✅ Closed system (can't communicate with external A2A agents)
+
+**Current Architecture:**
+
+```
+User Request → API Gateway → Developer Agent
+                                ↓ (internal messages)
+                              [MessageRouter]
+                                ↓
+                        ┌───────┼───────┬────────┐
+                        ↓       ↓       ↓        ↓
+                    GitHub   Repo    Repo   Relationship
+                    Agent   Agent1  Agent2     Agent
+```
+
+**Problems with Current Approach:**
+
+- ❌ Not A2A compliant (can't interoperate with external agents)
+- ❌ No HTTP transport (internal message bus only)
+- ❌ No Agent Cards (capabilities not discoverable)
+- ❌ No JSON-RPC methods (custom protocol)
+- ❌ No Task management (no stateful task lifecycle)
+- ❌ Closed ecosystem (can't call external agents, external agents can't call us)
+
+## Target State (Full A2A Compliance)
+
+### A2A Protocol Requirements
+
+**Core Requirements (Section 11.1 - Agent Compliance):**
+
+1. **Transport Support (Section 3)**
+   - ✅ MUST support at least one transport: JSON-RPC 2.0 over HTTP
+   - ✅ MUST expose Agent Card at `.well-known/agent-card.json`
+   - ✅ MUST declare supported transports in Agent Card
+
+2. **Core Methods (Section 7)**
+   - ✅ MUST implement `message/send` - Send messages and initiate tasks
+   - ✅ MUST implement `tasks/get` - Retrieve task status
+   - ✅ MUST implement `tasks/cancel` - Cancel running tasks
+
+3. **Data Structures (Section 6)**
+   - ✅ MUST use A2A Task object (id, contextId, status, history, artifacts)
+   - ✅ MUST use A2A Message object (role, parts, messageId, taskId)
+   - ✅ MUST use A2A Part types (TextPart, FilePart, DataPart)
+   - ✅ MUST use TaskState enum (submitted, working, completed, etc.)
+
+4. **Error Handling (Section 8)**
+   - ✅ MUST use JSON-RPC 2.0 error codes
+   - ✅ MUST use A2A-specific error codes (-32001 to -32007)
+
+**Target Architecture:**
+
+```
+External A2A Agent → HTTP → Developer Agent HTTP Endpoint
+                              ↓ (JSON-RPC 2.0)
+                        [A2A Task Manager]
+                              ↓
+User Request → API Gateway → Developer Agent
+                              ↓ (A2A HTTP)
+                     ┌────────┼────────┬────────┐
+                     ↓        ↓        ↓        ↓
+           GitHub Agent  Repo Agent Repo Agent Relationship Agent
+           (HTTP endpoint) (HTTP)    (HTTP)    (HTTP endpoint)
+                ↑           ↑         ↑         ↑
+External Agent  |           |         |         | External Agent
+    (can call)  └───────────┴─────────┴─────────┘ (can call)
+```
+
+**Each Agent Becomes:**
+
+- HTTP server with JSON-RPC 2.0 endpoint
+- Agent Card publisher (capabilities, skills, authentication)
+- Task manager (stateful task lifecycle)
+- A2A compliant (discoverable, interoperable)
+
+### What This Enables
+
+**Internal Benefits:**
+
+- Agents communicate via HTTP (standard, debuggable)
+- Task management (track progress, artifacts, history)
+- Error handling (standard JSON-RPC error codes)
+- Monitoring (HTTP access logs, metrics)
+
+**External Benefits:**
+
+- **Interoperability:** Our agents can call external A2A agents
+- **Discovery:** External agents can discover our agents
+- **Composition:** Mix our agents with 3rd-party A2A agents
+- **Ecosystem:** Participate in A2A agent marketplace
+
+**Example External Use Cases:**
+
+1. External "Code Review Agent" calls our Repository Agent to analyze code
+2. Our Developer Agent calls external "Security Scanner Agent" for vulnerability checks
+3. Third-party "Documentation Agent" discovers our agents via Agent Cards
+4. Enterprise integration: Our agents work with organization's A2A-compliant tools
+
+## Implementation Plan
+
+### Phase 1: A2A Core Infrastructure (Week 1-2)
+
+#### 1.1 Create A2A Type Definitions
+
+**File:** `shared/src/a2a/types.ts`
+
+Implement all A2A protocol types from Section 6:
 
 ```typescript
-// Developer Agent controls everything
-async coordinateAgents(query: string) {
-  const decomposition = await this.decompose(query);
+// Section 6.1: Task Object
+export interface A2ATask {
+  id: string; // UUID
+  contextId: string; // UUID
+  status: TaskStatus;
+  history?: A2AMessage[];
+  artifacts?: Artifact[];
+  metadata?: Record<string, any>;
+  readonly kind: 'task';
+}
 
-  // Orchestrator calls agents sequentially
-  const githubResults = await this.githubAgent.search(decomposition.github);
-  const repoResults = await this.repoAgent.analyze(githubResults);
-  const relationships = await this.relationshipAgent.build(repoResults);
+// Section 6.2: TaskStatus Object
+export interface TaskStatus {
+  state: TaskState;
+  message?: A2AMessage;
+  timestamp?: string; // ISO 8601
+}
 
-  return this.aggregate(githubResults, repoResults, relationships);
+// Section 6.3: TaskState Enum
+export enum TaskState {
+  Submitted = 'submitted',
+  Working = 'working',
+  InputRequired = 'input-required',
+  Completed = 'completed',
+  Canceled = 'canceled',
+  Failed = 'failed',
+  Rejected = 'rejected',
+  AuthRequired = 'auth-required',
+  Unknown = 'unknown',
+}
+
+// Section 6.4: Message Object
+export interface A2AMessage {
+  readonly role: 'user' | 'agent';
+  parts: Part[];
+  metadata?: Record<string, any>;
+  extensions?: string[];
+  referenceTaskIds?: string[];
+  messageId: string;
+  taskId?: string;
+  contextId?: string;
+  readonly kind: 'message';
+}
+
+// Section 6.5: Part Union Type
+export type Part = TextPart | FilePart | DataPart;
+
+export interface TextPart extends PartBase {
+  readonly kind: 'text';
+  text: string;
+}
+
+export interface FilePart extends PartBase {
+  readonly kind: 'file';
+  file: FileWithBytes | FileWithUri;
+}
+
+export interface DataPart extends PartBase {
+  readonly kind: 'data';
+  data: Record<string, any>;
+}
+
+export interface PartBase {
+  metadata?: Record<string, any>;
+}
+
+// Section 6.6: File Types
+export interface FileWithBytes extends FileBase {
+  bytes: string; // base64-encoded
+  uri?: never;
+}
+
+export interface FileWithUri extends FileBase {
+  uri: string;
+  bytes?: never;
+}
+
+export interface FileBase {
+  name?: string;
+  mimeType?: string;
+}
+
+// Section 6.7: Artifact Object
+export interface Artifact {
+  artifactId: string;
+  name?: string;
+  description?: string;
+  parts: Part[];
+  metadata?: Record<string, any>;
+  extensions?: string[];
 }
 ```
 
-**Problems:**
+#### 1.2 Implement JSON-RPC 2.0 Transport
 
-- ❌ Developer Agent is bottleneck (all communication through it)
-- ❌ Agents are passive (wait to be called, don't initiate)
-- ❌ No parallelism (agents run sequentially)
-- ❌ No collaboration (agents don't talk to each other)
-- ❌ Tight coupling (Developer Agent knows all agent APIs)
-
-## Target State (True A2A)
-
-**Desired Behavior:**
+**File:** `shared/src/a2a/transport/JsonRpcTransport.ts`
 
 ```typescript
-// Developer Agent observes and supervises
-async superviseCollaboration(query: string) {
-  const decomposition = await this.decompose(query);
+import express, { Express, Request, Response } from 'express';
 
-  // Send initial tasks to agents
-  await this.messageRouter.send({
-    to: 'github-agent',
-    type: 'request',
-    content: decomposition.github
-  });
-
-  // Agents collaborate autonomously
-  // - GitHub Agent discovers repos, messages Repository Agents
-  // - Repository Agents analyze code, message Relationship Agent
-  // - Relationship Agent builds graph, notifies Developer Agent
-  // - Developer Agent aggregates results when all complete
-
-  // Wait for completion (agents message back when done)
-  return this.waitForCompletion();
+// JSON-RPC Request/Response types (Section 6.11)
+export interface JSONRPCRequest {
+  jsonrpc: '2.0';
+  method: string;
+  params?: any;
+  id?: string | number | null;
 }
-```
 
-**Benefits:**
+export interface JSONRPCResponse {
+  jsonrpc: '2.0';
+  id: string | number | null;
+  result?: any;
+  error?: JSONRPCError;
+}
 
-- ✅ Parallelism (agents work simultaneously)
-- ✅ Autonomy (agents decide actions, not just execute commands)
-- ✅ Scalability (add agents without changing coordinator)
-- ✅ Loose coupling (agents only need message protocol)
-- ✅ Collaboration (agents discover and help each other)
+export interface JSONRPCError {
+  code: number;
+  message: string;
+  data?: any;
+}
 
-## Conversion Steps
+export class JsonRpcTransport {
+  private app: Express;
+  private methodHandlers: Map<string, MethodHandler> = new Map();
 
-### Step 1: Update Developer Agent (Orchestrator → Supervisor)
-
-**File:** `developer-agent/src/index.ts`
-
-**Changes:**
-
-1. Rename `coordinateAgents()` → `superviseCollaboration()`
-2. Change from synchronous calls to message sending
-3. Implement observer pattern (receive all agent messages)
-4. Add interruption mechanism (send priority commands)
-5. Remove direct agent API calls (use messages only)
-
-**Implementation:**
-
-```typescript
-class DeveloperAgent extends BaseAgent {
-  async superviseCollaboration(query: string): Promise<string> {
-    // Decompose query using GPT-4
-    const decomposition = await this.decomposeQuery(query);
-
-    // Send initial tasks to agents (they decide how to execute)
-    await this.sendMessage({
-      to: 'github-agent',
-      type: 'request',
-      content: { query: decomposition.github, taskId: this.generateTaskId() },
-    });
-
-    // Monitor agent collaboration
-    const completion = await this.monitorCollaboration(decomposition.taskId);
-
-    // Aggregate results when all agents report completion
-    return this.aggregateResults(completion);
+  constructor(private port: number) {
+    this.app = express();
+    this.app.use(express.json());
+    this.setupRoutes();
   }
 
-  async monitorCollaboration(taskId: string): Promise<AgentResults> {
-    // Set up message listeners for this task
-    return new Promise((resolve) => {
-      const results = {};
-      const expectedAgents = ['github-agent', 'repository-agents', 'relationship-agent'];
+  private setupRoutes(): void {
+    // Main JSON-RPC endpoint
+    this.app.post('/v1', async (req: Request, res: Response) => {
+      try {
+        const request = req.body as JSONRPCRequest;
 
-      this.messageRouter.on(`completion:${taskId}`, (msg) => {
-        results[msg.from] = msg.content;
-
-        // Check if all agents complete
-        if (Object.keys(results).length === expectedAgents.length) {
-          resolve(results);
+        // Validate JSON-RPC format
+        if (request.jsonrpc !== '2.0') {
+          return res.json(this.createError(-32600, 'Invalid Request', request.id));
         }
-      });
 
-      // Timeout: interrupt if agents don't complete in time
-      setTimeout(
-        () => {
-          this.interruptCollaboration(taskId, 'timeout');
-          resolve(results); // Return partial results
-        },
-        5 * 60 * 1000
-      ); // 5 minute timeout
-    });
-  }
+        // Find method handler
+        const handler = this.methodHandlers.get(request.method);
+        if (!handler) {
+          return res.json(this.createError(-32601, 'Method not found', request.id));
+        }
 
-  async interruptCollaboration(taskId: string, reason: string): Promise<void> {
-    // Send priority command to all agents
-    await this.messageRouter.broadcast({
-      type: 'command',
-      priority: 'urgent',
-      content: { action: 'cancel', taskId, reason },
-    });
-  }
-}
-```
+        // Execute method
+        const result = await handler(request.params);
 
-**Tests:**
-
-- Verify supervisor sends messages (not calls methods)
-- Verify observer receives all agent messages
-- Verify interruption mechanism works
-- Verify timeout handling
-
----
-
-### Step 2: Make GitHub Agent Autonomous
-
-**File:** `github-agent/src/BaseGitHubAgent.ts`
-
-**Changes:**
-
-1. Add autonomous loop (check for new tasks)
-2. Add collaboration initiator (message Repository Agents)
-3. Remove synchronous return values (send messages instead)
-4. Add status updates (notify Developer Agent of progress)
-
-**Implementation:**
-
-```typescript
-class BaseGitHubAgent extends BaseAgent {
-  async handleMessage(message: AgentMessage): Promise<void> {
-    if (message.type === 'request') {
-      await this.processSearchRequest(message);
-    }
-  }
-
-  private async processSearchRequest(message: AgentMessage): Promise<void> {
-    const { query, taskId } = message.content;
-
-    // Notify supervisor: starting work
-    await this.sendMessage({
-      to: 'developer-agent',
-      type: 'notification',
-      content: { status: 'started', taskId },
-    });
-
-    // Search GitHub repositories
-    const repos = await this.searchRepositories(query);
-
-    // Autonomously decide: message Repository Agents to analyze each repo
-    for (const repo of repos) {
-      await this.sendMessage({
-        to: 'repository-agents',
-        type: 'request',
-        content: { action: 'analyze', repo, taskId },
-      });
-    }
-
-    // Notify supervisor: completed discovery
-    await this.sendMessage({
-      to: 'developer-agent',
-      type: 'notification',
-      content: { status: 'completed', taskId, repoCount: repos.length },
-    });
-  }
-}
-```
-
-**Tests:**
-
-- Verify agent processes messages autonomously
-- Verify agent messages Repository Agents (not Developer Agent)
-- Verify status notifications sent correctly
-- Verify multiple repos handled in parallel
-
----
-
-### Step 3: Enable Repository Agent Collaboration
-
-**File:** `repository-agents/src/BaseRepositoryAgent*.ts`
-
-**Changes:**
-
-1. Add autonomous analysis loop
-2. Add peer messaging (send dependencies to Relationship Agent)
-3. Add work discovery (query shared state for repos to analyze)
-4. Remove synchronous analysis methods
-
-**Implementation:**
-
-```typescript
-class BaseRepositoryAgent extends BaseAgent {
-  async handleMessage(message: AgentMessage): Promise<void> {
-    if (message.type === 'request' && message.content.action === 'analyze') {
-      await this.analyzeRepository(message.content.repo, message.content.taskId);
-    }
-  }
-
-  private async analyzeRepository(repo: Repository, taskId: string): Promise<void> {
-    // Clone and analyze repository
-    const analysis = await this.performAnalysis(repo);
-
-    // Autonomously send dependencies to Relationship Agent
-    if (analysis.dependencies.length > 0) {
-      await this.sendMessage({
-        to: 'relationship-agent',
-        type: 'request',
-        content: {
-          action: 'add-dependencies',
-          repo: repo.name,
-          dependencies: analysis.dependencies,
-          taskId,
-        },
-      });
-    }
-
-    // Store embeddings (code search)
-    await this.storeEmbeddings(repo, analysis.files);
-
-    // Notify Developer Agent: completed this repo
-    await this.sendMessage({
-      to: 'developer-agent',
-      type: 'notification',
-      content: {
-        status: 'repo-analyzed',
-        repo: repo.name,
-        taskId,
-        summary: analysis.summary,
-      },
-    });
-  }
-}
-```
-
-**Tests:**
-
-- Verify agents analyze repos independently
-- Verify agents send dependencies to Relationship Agent
-- Verify agents don't wait for synchronous responses
-- Verify parallel analysis of multiple repos
-
----
-
-### Step 4: Make Relationship Agent Autonomous
-
-**File:** `relationship-agent/src/BaseRelationshipAgent.ts`
-
-**Changes:**
-
-1. Add autonomous graph building
-2. Add proactive notifications (notify when graph updates)
-3. Add query responses (respond to agent questions about relationships)
-4. Remove synchronous graph building methods
-
-**Implementation:**
-
-```typescript
-class BaseRelationshipAgent extends BaseAgent {
-  async handleMessage(message: AgentMessage): Promise<void> {
-    if (message.type === 'request') {
-      await this.handleRequest(message);
-    } else if (message.type === 'query') {
-      await this.handleQuery(message);
-    }
-  }
-
-  private async handleRequest(message: AgentMessage): Promise<void> {
-    const { action, repo, dependencies, taskId } = message.content;
-
-    if (action === 'add-dependencies') {
-      // Update Neo4j graph
-      await this.addDependenciesToGraph(repo, dependencies);
-
-      // Proactively notify Developer Agent: graph updated
-      await this.sendMessage({
-        to: 'developer-agent',
-        type: 'notification',
-        content: {
-          event: 'graph-updated',
-          repo,
-          newDependencies: dependencies.length,
-          taskId,
-        },
-      });
-
-      // Proactively notify Repository Agents: check for circular dependencies
-      const circular = await this.detectCircularDependencies(repo);
-      if (circular.length > 0) {
-        await this.sendMessage({
-          to: 'repository-agents',
-          type: 'notification',
-          content: {
-            warning: 'circular-dependencies',
-            repos: circular,
-            taskId,
-          },
+        // Return success response
+        return res.json({
+          jsonrpc: '2.0',
+          id: request.id,
+          result,
         });
+      } catch (error) {
+        return res.json(this.createError(-32603, 'Internal error', req.body.id, error));
       }
-    }
+    });
+
+    // Health check
+    this.app.get('/health', (req, res) => {
+      res.json({ status: 'healthy' });
+    });
   }
 
-  private async handleQuery(message: AgentMessage): Promise<void> {
-    const { question, repos } = message.content;
+  // Register method handler
+  registerMethod(method: string, handler: MethodHandler): void {
+    this.methodHandlers.set(method, handler);
+  }
 
-    // Answer questions about relationships
-    if (question === 'get-dependencies') {
-      const dependencies = await this.getDependencies(repos);
-
-      await this.sendMessage({
-        to: message.from,
-        type: 'response',
-        content: { dependencies },
+  // Start server
+  async start(): Promise<void> {
+    return new Promise((resolve) => {
+      this.app.listen(this.port, () => {
+        console.log(`JSON-RPC transport listening on port ${this.port}`);
+        resolve();
       });
-    }
+    });
+  }
+
+  private createError(code: number, message: string, id?: any, data?: any): JSONRPCResponse {
+    return {
+      jsonrpc: '2.0',
+      id: id ?? null,
+      error: { code, message, data },
+    };
   }
 }
+
+type MethodHandler = (params: any) => Promise<any>;
 ```
 
-**Tests:**
+#### 1.3 Implement Task Manager
 
-- Verify agent adds dependencies autonomously
-- Verify proactive notifications sent
-- Verify agent responds to queries from other agents
-- Verify circular dependency detection
-
----
-
-### Step 5: Update LangGraph Workflow
-
-**File:** `developer-agent/src/workflow.ts` (new file)
-
-**Changes:**
-
-1. Define LangGraph state schema for A2A
-2. Create workflow nodes for agent collaboration
-3. Add conditional edges (agents decide next steps)
-4. Implement checkpointing for interruption/resume
-
-**Implementation:**
+**File:** `shared/src/a2a/TaskManager.ts`
 
 ```typescript
-import { StateGraph, END } from '@langchain/langgraph';
+export class TaskManager {
+  private tasks: Map<string, A2ATask> = new Map();
 
-// State schema
-interface A2AWorkflowState {
-  taskId: string;
-  query: string;
-  decomposition: QueryDecomposition;
-  agentStatuses: Record<string, 'idle' | 'working' | 'complete'>;
-  messages: AgentMessage[];
-  results: Record<string, any>;
-  error?: string;
+  // Create new task
+  createTask(contextId: string, initialMessage: A2AMessage): A2ATask {
+    const task: A2ATask = {
+      id: this.generateUUID(),
+      contextId,
+      status: {
+        state: TaskState.Submitted,
+        timestamp: new Date().toISOString(),
+      },
+      history: [initialMessage],
+      artifacts: [],
+      kind: 'task',
+    };
+
+    this.tasks.set(task.id, task);
+    return task;
+  }
+
+  // Get task by ID
+  getTask(taskId: string): A2ATask | undefined {
+    return this.tasks.get(taskId);
+  }
+
+  // Update task status
+  updateTaskStatus(taskId: string, state: TaskState, message?: A2AMessage): void {
+    const task = this.tasks.get(taskId);
+    if (!task) {
+      throw new Error(`Task not found: ${taskId}`);
+    }
+
+    task.status = {
+      state,
+      message,
+      timestamp: new Date().toISOString(),
+    };
+
+    if (message) {
+      task.history?.push(message);
+    }
+  }
+
+  // Add artifact to task
+  addArtifact(taskId: string, artifact: Artifact): void {
+    const task = this.tasks.get(taskId);
+    if (!task) {
+      throw new Error(`Task not found: ${taskId}`);
+    }
+
+    if (!task.artifacts) {
+      task.artifacts = [];
+    }
+
+    task.artifacts.push(artifact);
+  }
+
+  // Cancel task
+  cancelTask(taskId: string, reason?: string): A2ATask {
+    const task = this.tasks.get(taskId);
+    if (!task) {
+      throw new Error(`Task not found: ${taskId}`);
+    }
+
+    if (this.isTerminalState(task.status.state)) {
+      throw new Error(`Cannot cancel task in ${task.status.state} state`);
+    }
+
+    this.updateTaskStatus(taskId, TaskState.Canceled, {
+      role: 'agent',
+      parts: [{ kind: 'text', text: reason || 'Task canceled by user' }],
+      messageId: this.generateUUID(),
+      taskId,
+      kind: 'message',
+    });
+
+    return task;
+  }
+
+  private isTerminalState(state: TaskState): boolean {
+    return [TaskState.Completed, TaskState.Canceled, TaskState.Failed, TaskState.Rejected].includes(
+      state
+    );
+  }
+
+  private generateUUID(): string {
+    return crypto.randomUUID();
+  }
 }
-
-// Create workflow graph
-const workflow = new StateGraph<A2AWorkflowState>({
-  channels: {
-    taskId: { value: (x: string) => x },
-    query: { value: (x: string) => x },
-    agentStatuses: { value: (x: Record<string, string>) => ({ ...x }) },
-    messages: { value: (x: AgentMessage[], y: AgentMessage[]) => [...x, ...y] },
-    results: { value: (x: Record<string, any>) => ({ ...x }) },
-  },
-});
-
-// Nodes
-workflow.addNode('decompose-query', async (state) => {
-  const decomposition = await decomposeQuery(state.query);
-  return { decomposition };
-});
-
-workflow.addNode('initiate-github-search', async (state) => {
-  await sendMessage({
-    to: 'github-agent',
-    type: 'request',
-    content: { query: state.decomposition.github, taskId: state.taskId },
-  });
-  return { agentStatuses: { 'github-agent': 'working' } };
-});
-
-workflow.addNode('monitor-collaboration', async (state) => {
-  // Wait for all agents to complete
-  const allComplete = Object.values(state.agentStatuses).every((status) => status === 'complete');
-
-  if (allComplete) {
-    return { status: 'complete' };
-  }
-
-  // Check for timeout
-  if (Date.now() - state.startTime > 5 * 60 * 1000) {
-    return { error: 'timeout', status: 'interrupted' };
-  }
-
-  return { status: 'monitoring' };
-});
-
-workflow.addNode('aggregate-results', async (state) => {
-  const aggregated = await aggregateResults(state.results);
-  return { finalResult: aggregated };
-});
-
-// Edges
-workflow.setEntryPoint('decompose-query');
-workflow.addEdge('decompose-query', 'initiate-github-search');
-workflow.addEdge('initiate-github-search', 'monitor-collaboration');
-
-// Conditional edge: monitor until complete or timeout
-workflow.addConditionalEdges('monitor-collaboration', (state) => {
-  if (state.status === 'complete') return 'aggregate-results';
-  if (state.error) return END;
-  return 'monitor-collaboration'; // Loop
-});
-
-workflow.addEdge('aggregate-results', END);
-
-// Compile with checkpointing
-export const a2aWorkflow = workflow.compile({
-  checkpointer: new PostgresCheckpointer(/* config */),
-});
 ```
 
-**Tests:**
+#### 1.4 Create Agent Card Builder
 
-- Verify workflow handles autonomous agent collaboration
-- Verify checkpointing (interruption and resume)
-- Verify timeout handling
-- Verify state updates from agent messages
-
----
-
-### Step 6: Update Message Routing
-
-**File:** `shared/src/messaging/MessageRouter.ts`
-
-**Changes:**
-
-1. Add broadcast filtering (agents can subscribe to topics)
-2. Add message prioritization enforcement
-3. Add developer agent observer (copy all messages)
-4. Add message validation (enforce A2A protocol)
-
-**Implementation:**
+**File:** `shared/src/a2a/AgentCardBuilder.ts`
 
 ```typescript
-class MessageRouter {
-  private observers: Set<string> = new Set(['developer-agent']);
+// Section 5: Agent Card types
+export interface AgentCard {
+  protocolVersion: string;
+  name: string;
+  description: string;
+  url: string;
+  preferredTransport?: TransportProtocol;
+  additionalInterfaces?: AgentInterface[];
+  iconUrl?: string;
+  provider?: AgentProvider;
+  version: string;
+  documentationUrl?: string;
+  capabilities: AgentCapabilities;
+  securitySchemes?: Record<string, SecurityScheme>;
+  security?: Record<string, string[]>[];
+  defaultInputModes: string[];
+  defaultOutputModes: string[];
+  skills: AgentSkill[];
+  supportsAuthenticatedExtendedCard?: boolean;
+  signatures?: AgentCardSignature[];
+}
 
-  async send(message: AgentMessage): Promise<void> {
-    // Validate message format
-    this.validateMessage(message);
+export enum TransportProtocol {
+  JSONRPC = 'JSONRPC',
+  GRPC = 'GRPC',
+  HTTP_JSON = 'HTTP+JSON',
+}
 
-    // Priority enforcement
-    await this.messageQueue.enqueue(message, message.priority || 'normal');
+export interface AgentInterface {
+  url: string;
+  transport: TransportProtocol | string;
+}
 
-    // Copy to observers (Developer Agent sees all messages)
-    for (const observer of this.observers) {
-      if (observer !== message.to && observer !== message.from) {
-        await this.notifyObserver(observer, message);
-      }
-    }
+export interface AgentCapabilities {
+  streaming?: boolean;
+  pushNotifications?: boolean;
+  stateTransitionHistory?: boolean;
+  extensions?: AgentExtension[];
+}
 
-    // Persist for audit trail
-    await this.messagePersistence.log(message);
+export interface AgentSkill {
+  id: string;
+  name: string;
+  description: string;
+  tags: string[];
+  examples?: string[];
+  inputModes?: string[];
+  outputModes?: string[];
+  security?: Record<string, string[]>[];
+}
 
-    // Deliver to recipient
-    await this.deliverMessage(message);
+export class AgentCardBuilder {
+  buildCard(agentType: 'developer' | 'github' | 'repository' | 'relationship'): AgentCard {
+    const cards = {
+      developer: this.buildDeveloperCard(),
+      github: this.buildGitHubCard(),
+      repository: this.buildRepositoryCard(),
+      relationship: this.buildRelationshipCard(),
+    };
+
+    return cards[agentType];
   }
 
-  async broadcast(message: BroadcastMessage): Promise<void> {
-    // Send to all agents matching topic filter
-    const recipients = this.getAgentsByTopic(message.topic);
-
-    for (const recipient of recipients) {
-      await this.send({
-        ...message,
-        to: recipient,
-        from: message.from,
-      });
-    }
+  private buildDeveloperCard(): AgentCard {
+    return {
+      protocolVersion: '0.3.0',
+      name: 'Developer Agent',
+      description:
+        'Coordinates analysis of software repositories, code relationships, and developer workflows. Acts as supervisor for multi-agent collaboration.',
+      url: 'http://localhost:3001/developer-agent/v1',
+      preferredTransport: TransportProtocol.JSONRPC,
+      version: '1.0.0',
+      capabilities: {
+        streaming: false,
+        pushNotifications: false,
+        stateTransitionHistory: true,
+      },
+      defaultInputModes: ['application/json', 'text/plain'],
+      defaultOutputModes: ['application/json', 'text/plain'],
+      skills: [
+        {
+          id: 'analyze-codebase',
+          name: 'Codebase Analysis',
+          description:
+            'Comprehensive analysis of software repositories including code structure, dependencies, and relationships',
+          tags: ['code-analysis', 'repository', 'dependencies', 'relationships'],
+          examples: [
+            'Analyze all repositories in the thehivegroup organization',
+            'Find dependencies for typescript-agent repository',
+          ],
+        },
+        {
+          id: 'coordinate-agents',
+          name: 'Agent Coordination',
+          description:
+            'Supervises collaboration between GitHub, Repository, and Relationship agents',
+          tags: ['coordination', 'supervision', 'multi-agent'],
+          examples: [
+            'Coordinate analysis of multiple repositories',
+            'Supervise relationship building',
+          ],
+        },
+      ],
+    };
   }
 
-  private validateMessage(message: AgentMessage): void {
-    // Enforce A2A protocol
-    if (!message.from || !message.to || !message.type) {
-      throw new Error('Invalid message format: missing required fields');
-    }
+  private buildGitHubCard(): AgentCard {
+    return {
+      protocolVersion: '0.3.0',
+      name: 'GitHub Agent',
+      description:
+        'Discovers and retrieves metadata from GitHub repositories. Searches organizations, users, and topics.',
+      url: 'http://localhost:3002/github-agent/v1',
+      preferredTransport: TransportProtocol.JSONRPC,
+      version: '1.0.0',
+      capabilities: {
+        streaming: false,
+        pushNotifications: false,
+      },
+      defaultInputModes: ['application/json', 'text/plain'],
+      defaultOutputModes: ['application/json'],
+      skills: [
+        {
+          id: 'search-repositories',
+          name: 'Repository Search',
+          description: 'Search GitHub for repositories by organization, user, topic, or keyword',
+          tags: ['github', 'search', 'repositories', 'discovery'],
+          examples: [
+            'Find all repositories in thehivegroup organization',
+            'Search for TypeScript repositories with topic "ai-agents"',
+          ],
+        },
+        {
+          id: 'get-repository-metadata',
+          name: 'Repository Metadata',
+          description: 'Retrieve detailed metadata for a specific repository',
+          tags: ['github', 'metadata', 'repository'],
+          examples: ['Get metadata for thehivegroup/developer-agent'],
+        },
+      ],
+    };
+  }
 
-    if (!['request', 'response', 'notification', 'query', 'command'].includes(message.type)) {
-      throw new Error(`Invalid message type: ${message.type}`);
-    }
+  private buildRepositoryCard(): AgentCard {
+    return {
+      protocolVersion: '0.3.0',
+      name: 'Repository Analysis Agent',
+      description:
+        'Analyzes code structure, dependencies, and patterns in software repositories. Supports TypeScript, Python, C#, Java, and more.',
+      url: 'http://localhost:3003/repository-agent/v1',
+      preferredTransport: TransportProtocol.JSONRPC,
+      version: '1.0.0',
+      capabilities: {
+        streaming: false,
+        pushNotifications: false,
+      },
+      defaultInputModes: ['application/json'],
+      defaultOutputModes: ['application/json'],
+      skills: [
+        {
+          id: 'analyze-dependencies',
+          name: 'Dependency Analysis',
+          description: 'Extract and analyze dependencies from package managers and project files',
+          tags: ['dependencies', 'npm', 'pip', 'nuget', 'maven'],
+          examples: [
+            'Analyze package.json dependencies',
+            'Extract Python requirements.txt dependencies',
+          ],
+        },
+        {
+          id: 'analyze-code-structure',
+          name: 'Code Structure Analysis',
+          description: 'Analyze code files, functions, classes, and module structure',
+          tags: ['code-analysis', 'ast', 'structure'],
+          examples: ['Parse TypeScript files', 'Extract class definitions from C# code'],
+        },
+      ],
+    };
+  }
 
-    // Only Developer Agent can send commands
-    if (message.type === 'command' && message.from !== 'developer-agent') {
-      throw new Error('Only Developer Agent can send command messages');
-    }
+  private buildRelationshipCard(): AgentCard {
+    return {
+      protocolVersion: '0.3.0',
+      name: 'Relationship Agent',
+      description:
+        'Builds and queries knowledge graphs of relationships between repositories, packages, and code entities. Uses Neo4j graph database.',
+      url: 'http://localhost:3004/relationship-agent/v1',
+      preferredTransport: TransportProtocol.JSONRPC,
+      version: '1.0.0',
+      capabilities: {
+        streaming: false,
+        pushNotifications: false,
+      },
+      defaultInputModes: ['application/json'],
+      defaultOutputModes: ['application/json'],
+      skills: [
+        {
+          id: 'build-dependency-graph',
+          name: 'Dependency Graph Building',
+          description: 'Create graph relationships between repositories and their dependencies',
+          tags: ['graph', 'neo4j', 'dependencies', 'relationships'],
+          examples: [
+            'Build dependency graph for multiple repositories',
+            'Link repositories to their npm packages',
+          ],
+        },
+        {
+          id: 'query-relationships',
+          name: 'Relationship Queries',
+          description: 'Query the knowledge graph for relationships and dependencies',
+          tags: ['graph', 'query', 'cypher', 'relationships'],
+          examples: [
+            'Find all repositories that depend on typescript-agent',
+            'Get transitive dependencies for a repository',
+          ],
+        },
+      ],
+    };
   }
 }
 ```
-
-**Tests:**
-
-- Verify all messages sent to Developer Agent (observer)
-- Verify priority enforcement
-- Verify message validation
-- Verify broadcast filtering
-
----
 
 ## Testing Strategy
 

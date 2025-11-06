@@ -51,6 +51,30 @@ export class DeveloperAgent extends BaseDeveloperAgent {
     return { success: true, message: 'Request received' };
   }
 
+  /**
+   * Handle incoming messages (Observer Pattern for A2A)
+   * Developer Agent receives copies of all agent messages for monitoring
+   */
+  override async handleMessage(message: AgentMessage): Promise<AgentMessage | null> {
+    this.log('info', 'Developer Agent observing message', {
+      from: message.from,
+      to: message.to,
+      messageType: message.messageType,
+      action: message.content.action,
+    });
+
+    // Log observed message for audit trail
+    if (this.state) {
+      await this.persistence.saveMessage(message, this.state.sessionId).catch((err: unknown) => {
+        this.log('error', 'Failed to persist observed message', { error: err });
+      });
+    }
+
+    // Supervisor observes but doesn't react (unless intervention needed)
+    // Actual message handling is done in monitorCollaboration
+    return null;
+  }
+
   async shutdown(): Promise<void> {
     this.log('info', 'Shutting down Developer Agent');
 
@@ -96,8 +120,8 @@ export class DeveloperAgent extends BaseDeveloperAgent {
       // Save checkpoint with tasks
       await this.checkpointManager.saveCheckpoint(sessionId, this.state);
 
-      // Coordinate agents to execute tasks
-      await this.coordinateAgents(tasks);
+      // Supervise autonomous agent collaboration
+      await this.superviseCollaboration(tasks);
 
       // Mark as completed
       this.state = StateManager.updateStatus(this.state, 'completed');
@@ -275,7 +299,172 @@ export class DeveloperAgent extends BaseDeveloperAgent {
   }
 
   /**
-   * Coordinate multiple agents
+   * Supervise autonomous agent collaboration (A2A Pattern)
+   * Send initial tasks to agents and monitor their autonomous collaboration
+   */
+  async superviseCollaboration(tasks: unknown[]): Promise<void> {
+    this.log('info', 'Supervising autonomous agent collaboration', { taskCount: tasks.length });
+
+    // Import and initialize agents
+    const { GitHubAgent } = await import('@developer-agent/github-agent');
+    const githubAgent = new GitHubAgent();
+    await githubAgent.init();
+    this.registerAgent(githubAgent);
+
+    const typedTasks = tasks as Array<{
+      id: string;
+      description: string;
+      assignedTo?: string;
+      dependencies: string[];
+    }>;
+
+    // Generate task ID for this collaboration session
+    const taskId = uuidv4();
+
+    // Send initial task to GitHub Agent (autonomous collaboration begins)
+    const githubTask = typedTasks.find((t) => t.assignedTo === 'github');
+    if (githubTask) {
+      this.log('info', 'Sending initial task to GitHub Agent', { taskId });
+
+      // Send message to GitHub Agent (it will autonomously collaborate with other agents)
+      this.sendMessage({
+        id: uuidv4(),
+        from: this.agentId,
+        to: githubAgent.getMetadata().agentId,
+        messageType: 'request',
+        content: {
+          action: 'discover',
+          parameters: {
+            query: this.state?.query || githubTask.description,
+            taskId,
+            limit: 5,
+          },
+        },
+        timestamp: new Date(),
+        priority: 'normal',
+      });
+
+      // Monitor autonomous collaboration
+      await this.monitorCollaboration(taskId, typedTasks);
+    }
+
+    // Cleanup: shutdown agents
+    await githubAgent.shutdown();
+    this.unregisterAgent(githubAgent.getMetadata().agentId);
+  }
+
+  /**
+   * Monitor autonomous agent collaboration
+   * Observe agent messages, track completion, handle timeouts
+   */
+  private async monitorCollaboration(
+    taskId: string,
+    tasks: Array<{ id: string; assignedTo?: string }>
+  ): Promise<void> {
+    this.log('info', 'Monitoring agent collaboration', { taskId });
+
+    return new Promise((resolve, reject) => {
+      const completedAgents = new Set<string>();
+      const expectedAgents = new Set(
+        tasks.map((t) => t.assignedTo).filter((a): a is string => !!a)
+      );
+
+      // Set up message listener for agent notifications
+      const messageHandler = (message: AgentMessage) => {
+        // Only process messages for this task
+        const params = message.content.parameters;
+        if (params && params.taskId === taskId) {
+          this.log('info', 'Received agent message', {
+            from: message.from,
+            messageType: message.messageType,
+            status: message.content.status?.state,
+          });
+
+          // Track agent completion
+          if (
+            message.messageType === 'notification' &&
+            message.content.status?.state === 'completed'
+          ) {
+            // Determine which agent completed
+            const agentType = this.getAgentType(message.from);
+            if (agentType) {
+              completedAgents.add(agentType);
+              this.log('info', 'Agent completed task', { agentType, taskId });
+            }
+
+            // Check if all agents have completed
+            if (completedAgents.size === expectedAgents.size) {
+              this.log('info', 'All agents completed collaboration', { taskId });
+              this.router.off('message:delivered', messageHandler);
+              clearTimeout(timeoutHandle);
+              resolve();
+            }
+          }
+        }
+      };
+
+      // Listen to all message deliveries (observer pattern)
+      this.router.on('message:delivered', messageHandler);
+
+      // Timeout: interrupt if agents don't complete in time
+      const timeoutHandle = setTimeout(
+        () => {
+          this.log('warn', 'Collaboration timeout - interrupting agents', { taskId });
+          this.router.off('message:delivered', messageHandler);
+          this.interruptCollaboration(taskId, 'timeout')
+            .then(() => resolve())
+            .catch((err) => reject(err));
+        },
+        5 * 60 * 1000
+      ); // 5 minute timeout
+    });
+  }
+
+  /**
+   * Interrupt agent collaboration
+   * Send priority command to all agents to cancel current task
+   */
+  private async interruptCollaboration(taskId: string, reason: string): Promise<void> {
+    this.log('warn', 'Interrupting collaboration', { taskId, reason });
+
+    // Broadcast cancel command to all agents
+    const agents = this.router['agents']; // Access private agents map
+    if (agents instanceof Map) {
+      for (const [agentId] of agents) {
+        if (agentId !== this.agentId) {
+          this.sendMessage({
+            id: uuidv4(),
+            from: this.agentId,
+            to: agentId,
+            messageType: 'command',
+            content: {
+              action: 'cancel',
+              parameters: {
+                taskId,
+                reason,
+              },
+            },
+            timestamp: new Date(),
+            priority: 'urgent',
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Get agent type from agent ID
+   */
+  private getAgentType(agentId: string): string | null {
+    if (agentId.includes('github')) return 'github';
+    if (agentId.includes('repository')) return 'repository';
+    if (agentId.includes('relationship')) return 'relationship';
+    return null;
+  }
+
+  /**
+   * Coordinate multiple agents (DEPRECATED - use superviseCollaboration)
+   * Kept for backward compatibility during transition
    */
   async coordinateAgents(tasks: unknown[]): Promise<void> {
     this.log('info', 'Coordinating agents for tasks', { taskCount: tasks.length });

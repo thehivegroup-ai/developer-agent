@@ -13,7 +13,8 @@ export type AgentStatus = 'idle' | 'busy' | 'waiting' | 'error' | 'destroyed';
 
 export type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'failed' | 'blocked';
 
-export type MessageType = 'request' | 'response' | 'notification' | 'error';
+// Message Types
+export type MessageType = 'request' | 'response' | 'notification' | 'error' | 'command';
 
 export type MessagePriority = 'low' | 'normal' | 'high' | 'urgent';
 
