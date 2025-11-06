@@ -101,6 +101,7 @@ npm run start:all
 ```
 
 This starts all services concurrently in a single terminal:
+
 - 🔵 API Gateway (Backend): http://localhost:3000
 - 🟣 Frontend (React): http://localhost:5173
 - 🟢 Developer Agent Service

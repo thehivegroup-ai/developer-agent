@@ -1,4 +1,5 @@
 import { Octokit } from '@octokit/rest';
+import { v4 as uuidv4 } from 'uuid';
 import { BaseGitHubAgent } from './BaseGitHubAgent.js';
 import type { AgentMessage, RepositoryType, RepositoryMetadata } from '@developer-agent/shared';
 
@@ -25,6 +26,7 @@ export class GitHubAgent extends BaseGitHubAgent {
   private rateLimitRemaining = 5000;
   private rateLimitReset = 0;
   private repositoryCache = new Map<string, RepositoryMetadata>();
+  private configuredRepositories: Array<{ owner: string; name: string; enabled: boolean }> = [];
 
   async init(): Promise<void> {
     // Initialize Octokit with token if available
@@ -35,6 +37,9 @@ export class GitHubAgent extends BaseGitHubAgent {
       userAgent: 'A2A-Developer-Agent/1.0',
     });
 
+    // Load configured repositories
+    await this.loadConfiguredRepositories();
+
     // Check rate limit
     await this.checkRateLimit();
 
@@ -42,11 +47,54 @@ export class GitHubAgent extends BaseGitHubAgent {
   }
 
   /**
+   * Load configured repositories from config/repositories.json
+   */
+  private async loadConfiguredRepositories(): Promise<void> {
+    try {
+      const { readFile } = await import('fs/promises');
+      const { resolve, dirname } = await import('path');
+      const { fileURLToPath } = await import('url');
+
+      // Get project root (go up from github-agent/src to project root)
+      const currentFile = fileURLToPath(import.meta.url);
+      const projectRoot = resolve(dirname(currentFile), '../../..');
+      const configPath = resolve(projectRoot, 'config/repositories.json');
+
+      const configData = await readFile(configPath, 'utf-8');
+      const config = JSON.parse(configData);
+
+      this.configuredRepositories = config.repositories || [];
+      this.log('info', 'Loaded configured repositories', {
+        count: this.configuredRepositories.length,
+      });
+    } catch (error) {
+      this.log('warn', 'Failed to load configured repositories, will use GitHub search', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      this.configuredRepositories = [];
+    }
+  }
+
+  /**
    * Handle incoming messages (A2A Pattern - Autonomous)
    * Process requests autonomously and initiate collaboration with other agents
    */
   override async handleMessage(message: AgentMessage): Promise<AgentMessage | null> {
-    const params = message.content.parameters;
+    // Debug logging to understand message structure
+    this.log('info', 'GitHub Agent handleMessage called', {
+      messageId: message.id,
+      hasContent: !!message.content,
+      contentKeys: message.content ? Object.keys(message.content) : [],
+      messageType: message.messageType,
+    });
+
+    // Defensive check: ensure message.content exists
+    if (!message.content) {
+      this.log('error', 'Received message with no content', { messageId: message.id, message });
+      return null;
+    }
+
+    const params = message.content.parameters ?? {};
     const action = message.content.action;
 
     this.log('info', 'GitHub Agent received message', {
@@ -71,7 +119,23 @@ export class GitHubAgent extends BaseGitHubAgent {
    * Discover repositories and initiate collaboration with Repository Agents
    */
   private async processSearchRequest(message: AgentMessage): Promise<AgentMessage> {
-    const params = message.content.parameters as Record<string, unknown>;
+    // Defensive check: ensure message.content and parameters exist
+    if (!message.content || !message.content.parameters) {
+      this.log('error', 'Search request missing content or parameters', { messageId: message.id });
+      return {
+        id: uuidv4(),
+        from: this.agentId,
+        to: message.from,
+        messageType: 'response',
+        content: {
+          status: { state: 'error', details: 'Invalid request: missing content or parameters' },
+        },
+        timestamp: new Date(),
+        priority: 'normal',
+      };
+    }
+
+    const params = message.content.parameters;
     const query = params?.query as string;
     const taskId = params?.taskId as string;
     const limit = (params?.limit as number) || 5;
@@ -171,6 +235,22 @@ export class GitHubAgent extends BaseGitHubAgent {
    * Process cancel command from supervisor
    */
   private async processCancelCommand(message: AgentMessage): Promise<AgentMessage> {
+    // Defensive check: ensure message.content exists
+    if (!message.content) {
+      this.log('error', 'Cancel command missing content', { messageId: message.id });
+      return {
+        id: uuidv4(),
+        from: this.agentId,
+        to: message.from,
+        messageType: 'response',
+        content: {
+          status: { state: 'error', details: 'Invalid cancel command: missing content' },
+        },
+        timestamp: new Date(),
+        priority: 'normal',
+      };
+    }
+
     const params = message.content.parameters as Record<string, unknown>;
     const taskId = params?.taskId as string;
     const reason = params?.reason as string;
@@ -238,6 +318,7 @@ export class GitHubAgent extends BaseGitHubAgent {
 
   /**
    * Discover repositories based on a search query
+   * Filters results to only include configured repositories
    */
   private async discoverRepositories(
     query: string,
@@ -248,6 +329,62 @@ export class GitHubAgent extends BaseGitHubAgent {
     }
 
     try {
+      // If we have configured repositories, filter by them
+      if (this.configuredRepositories.length > 0) {
+        this.log('info', 'Discovering from configured repositories', {
+          query,
+          configuredCount: this.configuredRepositories.length,
+        });
+
+        // Filter enabled repositories that match the query
+        const enabledRepos = this.configuredRepositories.filter(
+          (r) => r.enabled !== false
+        );
+
+        // Simple text matching on owner/name if query is provided
+        const matchingRepos = query
+          ? enabledRepos.filter((r) => {
+              const fullName = `${r.owner}/${r.name}`.toLowerCase();
+              const searchTerms = query.toLowerCase().split(' ');
+              return searchTerms.some((term) => fullName.includes(term));
+            })
+          : enabledRepos;
+
+        // Limit results
+        const reposToAnalyze = matchingRepos.slice(0, limit);
+
+        this.log('info', 'Analyzing matching configured repositories', {
+          matchingCount: matchingRepos.length,
+          analyzingCount: reposToAnalyze.length,
+        });
+
+        // Analyze each matching repository
+        const repositories: RepositoryMetadata[] = await Promise.all(
+          reposToAnalyze.map(async (repo) => {
+            const fullName = `${repo.owner}/${repo.name}`;
+            const cached = this.repositoryCache.get(fullName);
+            if (cached) return cached;
+
+            try {
+              await this.checkRateLimit();
+              const metadata = await this.extractRepositoryMetadata(repo.owner, repo.name);
+              this.repositoryCache.set(fullName, metadata);
+              return metadata;
+            } catch (error) {
+              this.log('warn', 'Failed to analyze repository', {
+                repo: fullName,
+                error: error instanceof Error ? error.message : 'Unknown error',
+              });
+              return null;
+            }
+          })
+        ).then((repos) => repos.filter((r): r is RepositoryMetadata => r !== null));
+
+        return { repositories };
+      }
+
+      // Fallback: use GitHub search API if no configured repositories
+      this.log('info', 'No configured repositories, using GitHub search', { query });
       await this.checkRateLimit();
 
       const { data } = await this.octokit.rest.search.repos({

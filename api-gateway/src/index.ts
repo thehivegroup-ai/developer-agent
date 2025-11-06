@@ -1,6 +1,5 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import websocket from '@fastify/websocket';
 import { appConfig } from './config/index.js';
 import { queryRoutes } from './routes/query.js';
 import { chatRoutes } from './routes/chat.js';
@@ -19,7 +18,8 @@ await fastify.register(cors, {
   origin: true, // Allow all origins in development
 });
 
-await fastify.register(websocket);
+// Note: We use Socket.IO for WebSockets (not @fastify/websocket)
+// Socket.IO is initialized on the HTTP server after fastify.listen()
 
 // Test database connection before registering routes
 console.log('Testing database connection...');

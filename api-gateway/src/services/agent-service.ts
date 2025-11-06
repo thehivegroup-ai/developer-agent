@@ -5,6 +5,7 @@ import { getOpenAIService } from './openai-service.js';
 
 /**
  * Agent Service - Manages Developer Agent lifecycle and query processing
+ * Handles initialization, query routing, and agent coordination
  */
 export class AgentService {
   private developerAgent: DeveloperAgent | null = null;

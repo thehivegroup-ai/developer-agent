@@ -39,6 +39,7 @@ export class DeveloperAgent extends BaseDeveloperAgent {
   }
 
   async init(): Promise<void> {
+    // Initialize developer agent - central orchestrator
     this.log('info', 'Developer Agent initialized', {
       agentId: this.agentId,
     });
