@@ -9,6 +9,7 @@
  * - Transport layer
  * - Task Manager
  * - Agent Card Builder
+ * - HTTP Client for inter-agent communication
  */
 
 // Export all A2A types
@@ -22,3 +23,6 @@ export * from './TaskManager';
 
 // Export Agent Card Builder
 export * from './AgentCardBuilder';
+
+// Export HTTP Client
+export * from './client/A2AHttpClient';
