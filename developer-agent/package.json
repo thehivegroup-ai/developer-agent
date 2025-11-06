@@ -8,6 +8,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "a2a": "tsx src/a2a-server.ts",
     "query": "tsx src/cli.ts",
     "search": "tsx src/search.ts",
     "relationships": "tsx src/relationships.ts",

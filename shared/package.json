@@ -23,7 +23,9 @@
     "db:migrate:down": "tsx src/database/migrate.ts down"
   },
   "dependencies": {
+    "@types/express": "^5.0.5",
     "dotenv": "^16.4.5",
+    "express": "^5.1.0",
     "pg": "^8.11.5",
     "pgvector": "^0.2.0",
     "uuid": "^10.0.0",

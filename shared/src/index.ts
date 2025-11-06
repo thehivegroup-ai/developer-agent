@@ -43,3 +43,6 @@ export * from './workflows/agent-workflow.js';
 
 // Logging
 export * from './logging/AgentLogger.js';
+
+// A2A Protocol (Agent-to-Agent Protocol v0.3.0)
+export * from './a2a/index.js';

@@ -1,7 +1,10 @@
 # Phase 7.5 Pivot: Full A2A Protocol Compliance
 
+> **⚠️ NOTE:** This document explains the strategic pivot and rationale for reference.  
+> **📍 Active Implementation:** See [`memory-bank/current/PHASE7.5_A2A_IMPLEMENTATION.md`](../current/PHASE7.5_A2A_IMPLEMENTATION.md) for current progress and todo list.
+
 **Date:** November 5, 2025  
-**Status:** Planning Complete - Ready for Implementation
+**Status:** Planning Complete - Reference Document
 
 ## Major Change
 

@@ -1,5 +1,5 @@
 ---
-applyTo: 'docs/**,memory-bank/**,*.md,README.md'
+applyTo: '**'
 ---
 
 # Documentation Organization Standards
@@ -293,6 +293,66 @@ Every documentation file **must** include:
 - Explain "Why" not just "What" and "How"
 - Add diagrams for complex concepts
 
+### Todo Lists and Task Tracking
+
+**⚠️ CRITICAL RULE: Todo lists MUST be maintained in plan documents, NOT in memory only.**
+
+**Requirements:**
+
+1. **Every plan document** (e.g., `PHASE7.5_A2A_IMPLEMENTATION.md`) **MUST include a Todo List section**
+2. **Update the document** whenever tasks are completed or status changes
+3. **Never rely solely on in-memory todo lists** managed by AI tools
+4. **Use clear status indicators**: `[ ]` not started, `[~]` in progress, `[x]` completed
+
+**Todo List Format:**
+
+```markdown
+## Todo List
+
+### Core Infrastructure (Tasks 1-4)
+
+- [x] **Task 1:** Implement A2A core type definitions
+  - Status: Completed
+  - Files: `shared/src/a2a/types.ts`
+  - Notes: 590 lines, full A2A Protocol v0.3.0 types
+- [~] **Task 2:** Build JSON-RPC 2.0 transport layer
+  - Status: In Progress
+  - Files: `shared/src/a2a/transport/JsonRpcTransport.ts`
+  - Next: Fix lint errors with Express types
+- [ ] **Task 3:** Create Task Manager
+  - Status: Not Started
+  - Files: `shared/src/a2a/TaskManager.ts`
+  - Dependencies: Task 1, Task 2
+```
+
+**Why This Matters:**
+
+- ✅ **Permanent record** of progress in version control
+- ✅ **Visible to all team members** without AI context
+- ✅ **Survives conversation sessions** - work continues across sessions
+- ✅ **Easy to review** what was done and what's pending
+- ✅ **Enables handoff** between developers or AI assistants
+
+**AI Assistant Behavior:**
+
+When managing a todo list:
+
+1. **Create/Update plan document** with todo list section
+2. **Update the file** after completing each task
+3. **Show progress** by updating status indicators
+4. **Never use** `manage_todo_list` tool as sole tracking mechanism
+5. **Always commit** todo list changes to the plan document
+
+**Example Update Flow:**
+
+```bash
+# After completing a task:
+1. Update status from [ ] to [x] in plan document
+2. Add completion notes (files created, key decisions)
+3. Update "Last Updated" date in document header
+4. Let user handle git commit (per workflow rules)
+```
+
 ## Documentation Workflow
 
 ### Starting New Work
@@ -301,14 +361,37 @@ Every documentation file **must** include:
 
 ```
 Create: memory-bank/planning/PHASEX_PLAN.md
-Include: Goals, timeline, deliverables, acceptance criteria
+Include: Goals, timeline, deliverables, acceptance criteria, todo list
+Status: Planning - not yet started
 ```
 
-**2. Implementation Phase:**
+**2. Implementation Phase (Plan Activation):**
+
+**⚠️ CRITICAL: When work begins, MOVE the plan from planning/ to current/**
 
 ```
-Create: memory-bank/current/phaseX-implementation-notes.md
-Update: Daily/weekly progress, decisions, blockers, solutions
+Move: memory-bank/planning/PHASEX_PLAN.md → memory-bank/current/PHASEX_IMPLEMENTATION.md
+Update: Change status to "Active"
+Update: Add "Last Updated" date
+Update: Mark first task as [~] in-progress
+Create: Additional notes files as needed (memory-bank/current/phaseX-notes.md)
+```
+
+**Rationale:**
+
+- ✅ Clear separation: `planning/` = future work, `current/` = active work
+- ✅ Easy to see what's happening NOW (look in `current/` directory)
+- ✅ Prevents confusion about which plan is active
+- ✅ Plan evolution tracked in version control (move = git mv)
+
+**During Implementation:**
+
+```
+Update: memory-bank/current/PHASEX_IMPLEMENTATION.md
+Frequency: After each task completion, daily/weekly for progress notes
+Update: Todo list status indicators [ ] → [~] → [x]
+Update: "Last Updated" date in header
+Add: Decisions, blockers, solutions, lessons learned
 ```
 
 **3. Completion Phase:**

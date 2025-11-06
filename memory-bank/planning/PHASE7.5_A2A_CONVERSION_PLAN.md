@@ -1,6 +1,9 @@
 # Phase 7.5: A2A Protocol Compliance Implementation
 
-**Status:** Planning - Ready for Implementation  
+> **⚠️ NOTE:** This is the original planning document for reference and context.  
+> **📍 Active Implementation:** See [`memory-bank/current/PHASE7.5_A2A_IMPLEMENTATION.md`](../current/PHASE7.5_A2A_IMPLEMENTATION.md) for current progress and todo list.
+
+**Status:** Planning - Reference Document  
 **Date:** November 5, 2025  
 **Duration:** 4-6 weeks  
 **Priority:** High (Strategic Architecture Evolution)  

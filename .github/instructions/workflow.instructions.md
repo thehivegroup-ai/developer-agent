@@ -10,6 +10,45 @@ applyTo: '**'
 
 This document defines **HOW** to work with version control, branches, commits, and code reviews. These standards are portable across all projects and languages.
 
+## ⚠️ CRITICAL RULE: Git Operations
+
+**AI/Copilot agents MUST NOT perform git operations directly.**
+
+**Prohibited Operations:**
+
+- ❌ `git add` (staging files)
+- ❌ `git commit` (creating commits)
+- ❌ `git push` (pushing to remote)
+- ❌ `git pull` (pulling from remote)
+- ❌ `git merge` (merging branches)
+- ❌ `git rebase` (rebasing branches)
+- ❌ `git branch` (creating/deleting branches)
+- ❌ `git checkout` (switching branches)
+- ❌ `git stash` (stashing changes)
+- ❌ Any other git command that modifies repository state
+
+**Allowed Operations:**
+
+- ✅ `git status` (checking status - READ ONLY)
+- ✅ `git diff` (viewing changes - READ ONLY)
+- ✅ `git log` (viewing history - READ ONLY)
+- ✅ Other READ ONLY git commands
+
+**Rationale:**
+
+- User controls when and how changes are committed
+- User decides commit messages and granularity
+- User manages branch strategy and timing
+- Prevents accidental commits of incomplete work
+- Maintains user's commit history preferences
+
+**What AI Should Do Instead:**
+
+1. Make code changes as requested
+2. Run tests and verify changes work
+3. Report what was changed and status
+4. Let user handle all git operations at appropriate time
+
 ## Branch Strategy
 
 ### Creating Branches
