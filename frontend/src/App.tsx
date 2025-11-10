@@ -1,10 +1,24 @@
 import { useState, useEffect } from 'react';
-import { ChatProvider } from './context/ChatContext';
+import { ChatProvider, useChat } from './context/ChatContext';
 import { WebSocketProvider } from './context/WebSocketContext';
 import ChatInterface from './components/ChatInterface';
 import Sidebar from './components/Sidebar';
 import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
+
+// Wrapper component that connects WebSocketProvider to ChatContext
+function AppContent() {
+  const { currentConversation } = useChat();
+
+  return (
+    <WebSocketProvider conversationId={currentConversation?.id || null}>
+      <div className="app">
+        <Sidebar />
+        <ChatInterface />
+      </div>
+    </WebSocketProvider>
+  );
+}
 
 function App() {
   const [username, setUsername] = useState<string>('');
@@ -67,18 +81,13 @@ function App() {
   return (
     <ErrorBoundary>
       <ChatProvider username={username}>
-        <WebSocketProvider>
-          <div className="app">
-            <Sidebar />
-            <ChatInterface />
-            <div className="app-footer">
-              <span className="username-display">👤 {username}</span>
-              <button className="logout-button" onClick={handleLogout}>
-                Logout
-              </button>
-            </div>
-          </div>
-        </WebSocketProvider>
+        <AppContent />
+        <div className="app-footer">
+          <span className="username-display">👤 {username}</span>
+          <button className="logout-button" onClick={handleLogout}>
+            Logout
+          </button>
+        </div>
       </ChatProvider>
     </ErrorBoundary>
   );

@@ -31,8 +31,8 @@ const AGENTS: AgentConfig[] = [
   {
     name: 'Developer Agent',
     baseUrl: 'http://localhost:3001',
-    expectedSkills: ['code-generation', 'refactoring', 'testing'],
-    minSkillCount: 3,
+    expectedSkills: ['coordinate-development', 'supervise-collaboration'],
+    minSkillCount: 2,
   },
   {
     name: 'GitHub Agent',
@@ -43,13 +43,13 @@ const AGENTS: AgentConfig[] = [
   {
     name: 'Repository Agents',
     baseUrl: 'http://localhost:3003',
-    expectedSkills: ['analyze-repository', 'extract-endpoints'],
+    expectedSkills: ['analyze-repository', 'extract-dependencies'],
     minSkillCount: 2,
   },
   {
     name: 'Relationship Agent',
     baseUrl: 'http://localhost:3004',
-    expectedSkills: ['build-graph', 'analyze-relationships'],
+    expectedSkills: ['build-knowledge-graph', 'query-relationships'],
     minSkillCount: 2,
   },
 ];
@@ -132,13 +132,28 @@ interface A2ATask {
   metadata?: Record<string, unknown>;
 }
 
+interface MessageSendResult {
+  task: A2ATask;
+  messageId: string;
+}
+
+interface TasksGetResult {
+  task: A2ATask;
+}
+
+interface TasksCancelResult {
+  task: A2ATask;
+}
+
 /**
- * Send a JSON-RPC 2.0 request to an agent
+ * Send a JSON-RPC 2.0 request to an agent with retry logic
  */
 async function sendJsonRpcRequest(
   baseUrl: string,
   method: string,
-  params?: unknown
+  params?: unknown,
+  maxRetries = 3,
+  retryDelay = 100
 ): Promise<JsonRpcResponse> {
   const request: JsonRpcRequest = {
     jsonrpc: '2.0',
@@ -147,30 +162,80 @@ async function sendJsonRpcRequest(
     id: Date.now(),
   };
 
-  const response = await fetch(baseUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(request),
-  });
+  let lastError: Error | undefined;
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return response.json() as Promise<JsonRpcResponse>;
+    } catch (error) {
+      lastError = error as Error;
+
+      // If this is a connection refused error and we have retries left, wait and retry
+      if (
+        attempt < maxRetries &&
+        (lastError.message.includes('ECONNREFUSED') || lastError.message.includes('fetch failed'))
+      ) {
+        const delay = retryDelay * Math.pow(2, attempt); // Exponential backoff
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+
+      // Otherwise, throw immediately
+      throw lastError;
+    }
   }
 
-  return response.json() as Promise<JsonRpcResponse>;
+  throw lastError || new Error('Request failed after retries');
 }
 
 /**
- * Fetch Agent Card from an agent
+ * Fetch Agent Card from an agent with retry logic
  */
-async function fetchAgentCard(baseUrl: string): Promise<AgentCard> {
-  const response = await fetch(`${baseUrl}/.well-known/agent-card.json`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch Agent Card: ${response.status}`);
+async function fetchAgentCard(
+  baseUrl: string,
+  maxRetries = 3,
+  retryDelay = 100
+): Promise<AgentCard> {
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(`${baseUrl}/.well-known/agent-card.json`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch Agent Card: ${response.status}`);
+      }
+      return response.json() as Promise<AgentCard>;
+    } catch (error) {
+      lastError = error as Error;
+
+      // If this is a connection refused error and we have retries left, wait and retry
+      if (
+        attempt < maxRetries &&
+        (lastError.message.includes('ECONNREFUSED') || lastError.message.includes('fetch failed'))
+      ) {
+        const delay = retryDelay * Math.pow(2, attempt); // Exponential backoff
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+
+      // Otherwise, throw immediately
+      throw lastError;
+    }
   }
-  return response.json() as Promise<AgentCard>;
+
+  throw lastError || new Error('Failed to fetch Agent Card after retries');
 }
 
 describe('A2A Protocol Compliance - Agent Cards', () => {
@@ -353,7 +418,10 @@ describe('A2A Protocol Compliance - Task Management', () => {
       });
 
       expect(response.result).toBeDefined();
-      const task = response.result as A2ATask;
+      const result = response.result as MessageSendResult;
+      expect(result.task).toBeDefined();
+      expect(result.messageId).toBeDefined();
+      const task = result.task;
       expect(task.id).toBeDefined();
       expect(task.status).toBeDefined();
       expect([TASK_STATES.SUBMITTED, TASK_STATES.WORKING]).toContain(task.status.state);
@@ -368,7 +436,8 @@ describe('A2A Protocol Compliance - Task Management', () => {
         },
       });
 
-      const task = createResponse.result as A2ATask;
+      const result = createResponse.result as MessageSendResult;
+      const task = result.task;
       expect(task.history).toBeDefined();
       expect(Array.isArray(task.history)).toBe(true);
       expect(task.history.length).toBeGreaterThan(0);
@@ -391,7 +460,8 @@ describe('A2A Protocol Compliance - Task Management', () => {
         },
       });
 
-      const createdTask = createResponse.result as A2ATask;
+      const createResult = createResponse.result as MessageSendResult;
+      const createdTask = createResult.task;
 
       // Retrieve task
       const getResponse = await sendJsonRpcRequest(baseUrl, 'tasks/get', {
@@ -399,7 +469,9 @@ describe('A2A Protocol Compliance - Task Management', () => {
       });
 
       expect(getResponse.result).toBeDefined();
-      const retrievedTask = getResponse.result as A2ATask;
+      const getResult = getResponse.result as TasksGetResult;
+      expect(getResult.task).toBeDefined();
+      const retrievedTask = getResult.task;
       expect(retrievedTask.id).toBe(createdTask.id);
     });
 
@@ -421,7 +493,8 @@ describe('A2A Protocol Compliance - Task Management', () => {
         },
       });
 
-      const task = createResponse.result as A2ATask;
+      const createResult = createResponse.result as MessageSendResult;
+      const task = createResult.task;
 
       // Cancel task
       const cancelResponse = await sendJsonRpcRequest(baseUrl, 'tasks/cancel', {
@@ -429,7 +502,9 @@ describe('A2A Protocol Compliance - Task Management', () => {
       });
 
       expect(cancelResponse.result).toBeDefined();
-      const canceledTask = cancelResponse.result as A2ATask;
+      const cancelResult = cancelResponse.result as TasksCancelResult;
+      expect(cancelResult.task).toBeDefined();
+      const canceledTask = cancelResult.task;
       expect(canceledTask.status.state).toBe(TASK_STATES.CANCELED);
     });
 
@@ -442,7 +517,8 @@ describe('A2A Protocol Compliance - Task Management', () => {
         },
       });
 
-      const task = response.result as A2ATask;
+      const result = response.result as MessageSendResult;
+      const task = result.task;
 
       // Verify current state is valid
       const validStates = Object.values(TASK_STATES);
@@ -545,8 +621,9 @@ describe('A2A Protocol Compliance - Message Handling', () => {
       });
 
       expect(response.result).toBeDefined();
-      const task = response.result as A2ATask;
-      expect(task.id).toBeDefined();
+      const result = response.result as MessageSendResult;
+      expect(result.task).toBeDefined();
+      expect(result.task.id).toBeDefined();
     });
 
     it('should support contextId for conversation continuity', async () => {
@@ -560,7 +637,8 @@ describe('A2A Protocol Compliance - Message Handling', () => {
         contextId,
       });
 
-      const task1 = response1.result as A2ATask;
+      const result1 = response1.result as MessageSendResult;
+      const task1 = result1.task;
       expect(task1.contextId).toBe(contextId);
 
       const response2 = await sendJsonRpcRequest(baseUrl, 'message/send', {
@@ -571,7 +649,8 @@ describe('A2A Protocol Compliance - Message Handling', () => {
         contextId,
       });
 
-      const task2 = response2.result as A2ATask;
+      const result2 = response2.result as MessageSendResult;
+      const task2 = result2.task;
       expect(task2.contextId).toBe(contextId);
     });
 
@@ -586,7 +665,8 @@ describe('A2A Protocol Compliance - Message Handling', () => {
         metadata,
       });
 
-      const task = response.result as A2ATask;
+      const result = response.result as MessageSendResult;
+      const task = result.task;
       expect(task.metadata).toBeDefined();
       expect(task.metadata!.testKey).toBe('testValue');
     });

@@ -249,7 +249,7 @@ describe('Repository Agents A2A Server - Task Management', () => {
   it('should fail to retrieve non-existent task', async () => {
     const result = await rpcRequest('tasks/get', { taskId: 'non-existent-task-id-12345' });
     expect(result).toHaveProperty('error');
-    expect(result.error.code).toBe(-32001); // UNSUPPORTED_MESSAGE_FORMAT (task validation error)
+    expect(result.error.code).toBe(-32602); // JSON-RPC INVALID_PARAMS for invalid task ID
   });
 
   it('should track task status changes', async () => {
@@ -347,7 +347,7 @@ describe('Repository Agents A2A Server - Message Handling', () => {
     });
 
     expect(result).toHaveProperty('error');
-    expect(result.error.code).toBe(-32005); // INVALID_MESSAGE (validation error)
+    expect(result.error.code).toBe(-32602); // Invalid params (empty parts array)
   });
 
   it('should handle message with multiple text parts', async () => {
@@ -370,7 +370,7 @@ describe('Repository Agents A2A Server - Error Handling', () => {
   it('should return proper error for invalid params', async () => {
     const result = await rpcRequest('tasks/get', {}); // Missing taskId
     expect(result).toHaveProperty('error');
-    expect(result.error.code).toBe(-32001); // Validation error (UNSUPPORTED_MESSAGE_FORMAT)
+    expect(result.error.code).toBe(-32602); // JSON-RPC INVALID_PARAMS for missing taskId
   });
 
   it('should handle task continuation with taskId', async () => {

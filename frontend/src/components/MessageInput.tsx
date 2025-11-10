@@ -1,16 +1,22 @@
 import { useState, KeyboardEvent } from 'react';
 import { useChat } from '../context/ChatContext';
+import { useWebSocket } from '../context/WebSocketContext';
 import './MessageInput.css';
 
 export default function MessageInput() {
   const [input, setInput] = useState('');
   const { sendMessage, isLoading } = useChat();
+  const { clearActivities } = useWebSocket();
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
     const message = input.trim();
     setInput('');
+
+    // Clear agent activities from previous message
+    clearActivities();
+
     await sendMessage(message);
   };
 

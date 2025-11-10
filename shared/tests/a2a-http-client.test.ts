@@ -341,7 +341,7 @@ describe('A2AHttpClient - Error Handling', () => {
 
   it('should retry on network errors', async () => {
     const slowClient = new A2AHttpClient({
-      timeout: 100, // Very short timeout to force failure
+      timeout: 1, // Extremely short timeout to force failure
       maxRetries: 2,
       retryDelay: 50,
       debug: false,

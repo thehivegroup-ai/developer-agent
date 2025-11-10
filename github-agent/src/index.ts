@@ -25,7 +25,7 @@ export class GitHubAgent extends BaseGitHubAgent {
   private octokit: Octokit | null = null;
   private rateLimitRemaining = 5000;
   private rateLimitReset = 0;
-  private repositoryCache = new Map<string, RepositoryMetadata>();
+  private readonly repositoryCache = new Map<string, RepositoryMetadata>();
   private configuredRepositories: Array<{ owner: string; name: string; enabled: boolean }> = [];
 
   async init(): Promise<void> {
@@ -40,8 +40,15 @@ export class GitHubAgent extends BaseGitHubAgent {
     // Load configured repositories
     await this.loadConfiguredRepositories();
 
-    // Check rate limit
-    await this.checkRateLimit();
+    // Check rate limit ONCE at initialization
+    try {
+      const { data } = await this.octokit.rest.rateLimit.get();
+      this.rateLimitRemaining = data.rate.remaining;
+      this.rateLimitReset = data.rate.reset;
+      console.log(`✅ GitHub API rate limit: ${this.rateLimitRemaining} remaining`);
+    } catch (error) {
+      console.warn('⚠️  Could not check GitHub rate limit:', error);
+    }
 
     console.log('✅ GitHub Agent initialized');
   }
@@ -57,17 +64,26 @@ export class GitHubAgent extends BaseGitHubAgent {
 
       // Get project root (go up from github-agent/src to project root)
       const currentFile = fileURLToPath(import.meta.url);
-      const projectRoot = resolve(dirname(currentFile), '../../..');
+      const projectRoot = resolve(dirname(currentFile), '../..');
       const configPath = resolve(projectRoot, 'config/repositories.json');
+
+      console.log(`[GitHub Agent] Loading repositories from: ${configPath}`);
 
       const configData = await readFile(configPath, 'utf-8');
       const config = JSON.parse(configData);
 
       this.configuredRepositories = config.repositories || [];
+      console.log(
+        `✅ [GitHub Agent] Loaded ${this.configuredRepositories.length} configured repositories`
+      );
       this.log('info', 'Loaded configured repositories', {
         count: this.configuredRepositories.length,
       });
     } catch (error) {
+      console.error(
+        `❌ [GitHub Agent] Failed to load configured repositories:`,
+        error instanceof Error ? error.message : error
+      );
       this.log('warn', 'Failed to load configured repositories, will use GitHub search', {
         error: error instanceof Error ? error.message : 'Unknown error',
       });
@@ -86,21 +102,40 @@ export class GitHubAgent extends BaseGitHubAgent {
       hasContent: !!message.content,
       contentKeys: message.content ? Object.keys(message.content) : [],
       messageType: message.messageType,
+      fullMessage: JSON.stringify(message, null, 2),
     });
 
     // Defensive check: ensure message.content exists
     if (!message.content) {
       this.log('error', 'Received message with no content', { messageId: message.id, message });
-      return null;
+      return this.createErrorResponse(
+        message,
+        'INVALID_MESSAGE',
+        'Message content is missing or undefined'
+      );
     }
 
-    const params = message.content.parameters ?? {};
+    // Safely access parameters
     const action = message.content.action;
+    const params = message.content.parameters;
+
+    if (!params) {
+      this.log('error', 'Message content.parameters is undefined', {
+        messageId: message.id,
+        hasContent: !!message.content,
+        content: message.content,
+      });
+      return this.createErrorResponse(
+        message,
+        'INVALID_MESSAGE',
+        'Message content.parameters is missing or undefined'
+      );
+    }
 
     this.log('info', 'GitHub Agent received message', {
       from: message.from,
       action,
-      taskId: params?.taskId,
+      taskId: params.taskId,
     });
 
     if (message.messageType === 'request' && action === 'discover') {
@@ -125,6 +160,7 @@ export class GitHubAgent extends BaseGitHubAgent {
       return {
         id: uuidv4(),
         from: this.agentId,
+
         to: message.from,
         messageType: 'response',
         content: {
@@ -320,7 +356,7 @@ export class GitHubAgent extends BaseGitHubAgent {
    * Discover repositories based on a search query
    * Filters results to only include configured repositories
    */
-  private async discoverRepositories(
+  public async discoverRepositories(
     query: string,
     limit = 10
   ): Promise<RepositoryDiscoveryResponse> {
@@ -337,18 +373,25 @@ export class GitHubAgent extends BaseGitHubAgent {
         });
 
         // Filter enabled repositories that match the query
-        const enabledRepos = this.configuredRepositories.filter(
-          (r) => r.enabled !== false
-        );
+        const enabledRepos = this.configuredRepositories.filter((r) => r.enabled !== false);
 
-        // Simple text matching on owner/name if query is provided
-        const matchingRepos = query
-          ? enabledRepos.filter((r) => {
+        // Check if query is asking for "all repositories" or similar
+        const isListingQuery =
+          !query ||
+          /what\s+repositories/i.test(query) ||
+          /list\s+repositories/i.test(query) ||
+          /show\s+repositories/i.test(query) ||
+          /all\s+repositories/i.test(query) ||
+          /repositories\s+are\s+you\s+aware/i.test(query);
+
+        // Simple text matching on owner/name if query is provided and specific
+        const matchingRepos = isListingQuery
+          ? enabledRepos
+          : enabledRepos.filter((r) => {
               const fullName = `${r.owner}/${r.name}`.toLowerCase();
               const searchTerms = query.toLowerCase().split(' ');
               return searchTerms.some((term) => fullName.includes(term));
-            })
-          : enabledRepos;
+            });
 
         // Limit results
         const reposToAnalyze = matchingRepos.slice(0, limit);
@@ -366,7 +409,7 @@ export class GitHubAgent extends BaseGitHubAgent {
             if (cached) return cached;
 
             try {
-              await this.checkRateLimit();
+              // extractRepositoryMetadata will check rate limit internally
               const metadata = await this.extractRepositoryMetadata(repo.owner, repo.name);
               this.repositoryCache.set(fullName, metadata);
               return metadata;
@@ -385,7 +428,12 @@ export class GitHubAgent extends BaseGitHubAgent {
 
       // Fallback: use GitHub search API if no configured repositories
       this.log('info', 'No configured repositories, using GitHub search', { query });
-      await this.checkRateLimit();
+      // Check rate limit once before search (no API call, just checks cache)
+      const canProceed = this.checkRateLimit();
+      if (!canProceed) {
+        this.log('warn', 'GitHub rate limit too low, skipping search');
+        return { repositories: [], error: 'Rate limit exceeded' };
+      }
 
       const { data } = await this.octokit.rest.search.repos({
         q: query,
@@ -401,6 +449,7 @@ export class GitHubAgent extends BaseGitHubAgent {
 
           if (!repo.owner) return null;
 
+          // extractRepositoryMetadata checks rate limit internally
           const metadata = await this.extractRepositoryMetadata(repo.owner.login, repo.name);
           this.repositoryCache.set(repo.full_name, metadata);
           return metadata;
@@ -448,7 +497,26 @@ export class GitHubAgent extends BaseGitHubAgent {
       throw new Error('GitHub client not initialized');
     }
 
-    await this.checkRateLimit();
+    // Only check rate limit ONCE before making API calls (no actual API call, just checks cache)
+    const canProceed = this.checkRateLimit();
+    if (!canProceed) {
+      this.log('warn', 'GitHub rate limit too low, returning minimal metadata');
+      return {
+        fullName: `${owner}/${repo}`,
+        owner,
+        name: repo,
+        description: 'Rate limit exceeded - unable to fetch metadata',
+        detectedType: 'unknown',
+        detectionConfidence: 0,
+        defaultBranch: 'main',
+        primaryLanguage: 'Unknown',
+        languages: {},
+        sizeKb: 0,
+        lastUpdated: new Date(),
+        topics: [],
+        cachedAt: new Date(),
+      };
+    }
 
     // Get repository details
     const { data: repoData } = await this.octokit.rest.repos.get({
@@ -462,7 +530,7 @@ export class GitHubAgent extends BaseGitHubAgent {
       repo,
     });
 
-    // Detect repository type
+    // Detect repository type (will also check rate limit internally)
     const detectedType = await this.detectRepositoryType(owner, repo);
 
     return {
@@ -493,7 +561,7 @@ export class GitHubAgent extends BaseGitHubAgent {
       throw new Error('GitHub client not initialized');
     }
 
-    await this.checkRateLimit();
+    // Rate limit already checked in extractRepositoryMetadata, no need to check again
 
     const indicators: string[] = [];
     let type: RepositoryType = 'unknown';
@@ -626,31 +694,21 @@ export class GitHubAgent extends BaseGitHubAgent {
 
   /**
    * Check GitHub API rate limit
+   * NOTE: Only checks in-memory cache, does NOT make API call
+   * Returns true if safe to proceed, false if rate limit is too low
    */
-  private async checkRateLimit(): Promise<void> {
-    if (!this.octokit) return;
+  private checkRateLimit(): boolean {
+    if (!this.octokit) return true;
 
-    // Check if we're close to reset time
+    // Check if we're close to reset time and have low remaining calls
     const now = Date.now() / 1000;
     if (now < this.rateLimitReset && this.rateLimitRemaining < 100) {
-      const waitTime = (this.rateLimitReset - now) * 1000;
+      const waitTime = this.rateLimitReset - now;
       console.warn(
-        `⚠️ GitHub rate limit low (${this.rateLimitRemaining} remaining). Waiting ${Math.round(waitTime / 1000)}s...`
+        `⚠️ GitHub rate limit low (${this.rateLimitRemaining} remaining). Reset in ${Math.round(waitTime)}s. Skipping operation.`
       );
-      await new Promise((resolve) => setTimeout(resolve, Math.min(waitTime, 60000)));
+      return false; // Don't wait, just return false
     }
-
-    // Update rate limit info
-    try {
-      const { data } = await this.octokit.rest.rateLimit.get();
-      this.rateLimitRemaining = data.rate.remaining;
-      this.rateLimitReset = data.rate.reset;
-
-      if (this.rateLimitRemaining < 50) {
-        console.warn(`⚠️ GitHub API rate limit low: ${this.rateLimitRemaining} remaining`);
-      }
-    } catch (error) {
-      console.error('Error checking rate limit:', error);
-    }
+    return true;
   }
 }

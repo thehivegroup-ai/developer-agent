@@ -132,6 +132,9 @@ export async function githubDiscoveryNode(
 
     const result = { repositories };
     console.log(`   Successfully analyzed ${repositories.length} repositories`);
+    console.log(
+      `   Repository names: ${repositories.map((r: any) => r.name || r.full_name).join(', ')}`
+    );
 
     // Update task status
     const updatedTasks = state.tasks.map((t) =>

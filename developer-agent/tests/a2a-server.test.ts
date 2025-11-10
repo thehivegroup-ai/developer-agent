@@ -247,7 +247,7 @@ describe('A2A Server - Task Management', () => {
     });
 
     expect(response.error).toBeDefined();
-    expect(response.error?.code).toBe(-32001); // A2A error code for not found
+    expect(response.error?.code).toBe(-32602); // JSON-RPC INVALID_PARAMS for invalid task ID
   });
 
   it('should cancel a task via tasks/cancel', async () => {

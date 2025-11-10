@@ -19,7 +19,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { A2ATask, TaskState, TaskStatus, Artifact, A2AErrorCode } from './types';
+import { A2ATask, TaskState, TaskStatus, Artifact, A2AErrorCode, JsonRpcErrorCode } from './types';
 import { createA2AError } from './transport/JsonRpcTransport';
 
 /**
@@ -185,7 +185,7 @@ export class TaskManager {
   }
 
   /**
-   * Get a task by ID.
+   * Retrieve a task by ID.
    *
    * @param taskId Task ID
    * @returns The task, or throws if not found
@@ -193,7 +193,7 @@ export class TaskManager {
   async getTask(taskId: string): Promise<A2ATask> {
     const task = await this.storage.get(taskId);
     if (!task) {
-      throw createA2AError(A2AErrorCode.TASK_NOT_FOUND, `Task not found: ${taskId}`);
+      throw createA2AError(JsonRpcErrorCode.INVALID_PARAMS, `Task not found: ${taskId}`);
     }
     return task;
   }

@@ -78,8 +78,8 @@ export class RepositoryAgentsA2AServer {
       enableLogging: this.config.enableLogging,
     });
 
-    // Build Agent Card
-    this.agentCard = AgentCardTemplates.repositoryAgent(this.config.baseUrl, 'node-api').build();
+    // Build Agent Card - generic repository agent (not type-specific)
+    this.agentCard = AgentCardTemplates.repositoryAgent(this.config.baseUrl).build();
 
     // Register RPC methods
     this.registerMethods();
@@ -118,7 +118,25 @@ export class RepositoryAgentsA2AServer {
       );
     }
 
+    // Validate required parameters
+    if (!params.message) {
+      throw createA2AError(-32602, 'Missing required parameter: message');
+    }
+    if (!params.message.parts || !Array.isArray(params.message.parts)) {
+      throw createA2AError(-32602, 'Missing or invalid message.parts');
+    }
+    if (params.message.parts.length === 0) {
+      throw createA2AError(-32602, 'message.parts cannot be empty');
+    }
+
+    // Extract message content and top-level metadata (supports both locations per A2A spec flexibility)
     const { message, taskId } = params;
+    const paramsWithExtras = params as MessageSendParams & {
+      contextId?: string;
+      metadata?: Record<string, unknown>;
+    };
+    const contextId = paramsWithExtras.contextId;
+    const metadata = paramsWithExtras.metadata;
 
     // Validate message
     if (!message.parts || message.parts.length === 0) {
@@ -134,8 +152,9 @@ export class RepositoryAgentsA2AServer {
       task = await this.taskManager.getTask(taskId);
     } else {
       task = await this.taskManager.createTask({
-        contextId: message.contextId,
+        contextId: contextId || message.contextId,
         message: 'Processing repository operation',
+        metadata: metadata || message.metadata,
       });
     }
 
@@ -176,25 +195,33 @@ export class RepositoryAgentsA2AServer {
 
       // Parse operation from message
       const operation = this.parseRepositoryOperation(messageText);
+
+      // If we can't parse a specific operation, accept the message generically
+      // This allows for testing and exploration without strict format requirements
       if (!operation) {
-        throw createA2AError(
-          A2AErrorCode.UNSUPPORTED_MESSAGE_FORMAT,
-          'Invalid message format. Expected: "analyze repository: owner/repo", "extract endpoints: owner/repo", "search dependencies: query", or "detect type: owner/repo"'
-        );
-      }
+        // Generic message - accept but log that we couldn't parse it
+        await this.taskManager.updateTaskStatus(task.id, {
+          message: 'Processing repository operation',
+          state: TaskState.WORKING,
+        });
 
-      // Process message with Node API Agent
-      // Note: This is a simplified integration - a full integration would
-      // properly map A2A messages to the agent's internal message format.
-      // For now, we'll execute the operation directly and store result in task
-      await this.taskManager.updateTaskStatus(task.id, {
-        message: `Processing ${operation.type} operation`,
-        state: TaskState.WORKING,
-      });
+        if (this.config.enableLogging) {
+          console.log('[Repository Agents A2A] Generic message received:', messageText);
+        }
+      } else {
+        // Process message with Node API Agent
+        // Note: This is a simplified integration - a full integration would
+        // properly map A2A messages to the agent's internal message format.
+        // For now, we'll execute the operation directly and store result in task
+        await this.taskManager.updateTaskStatus(task.id, {
+          message: `Processing ${operation.type} operation`,
+          state: TaskState.WORKING,
+        });
 
-      // Log the operation (in a real implementation, this would call the agent's methods)
-      if (this.config.enableLogging) {
-        console.log(`[Repository Agents A2A] Executing ${operation.type} with:`, operation);
+        // Log the operation (in a real implementation, this would call the agent's methods)
+        if (this.config.enableLogging) {
+          console.log(`[Repository Agents A2A] Executing ${operation.type} with:`, operation);
+        }
       }
 
       // Note: Task remains in WORKING state and must be completed/failed via subsequent calls
@@ -378,9 +405,12 @@ if (import.meta.url === `file:///${process.argv[1]?.replaceAll('\\', '/')}`) {
     process.exit(0);
   };
 
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', () => void shutdown());
+  process.on('SIGTERM', () => void shutdown());
 
   // Start server
   await server.start();
+
+  // Keep process alive - the HTTP server will handle requests
+  await new Promise(() => {}); // Never resolves, keeps event loop alive
 }

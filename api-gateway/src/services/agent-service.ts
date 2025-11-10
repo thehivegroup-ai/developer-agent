@@ -1,15 +1,15 @@
-import { DeveloperAgent } from '@developer-agent/developer-agent';
 import { websocketService } from './websocket-service.js';
-import { updateQueryStatus } from '@developer-agent/shared';
-import { getOpenAIService } from './openai-service.js';
+import { updateQueryStatus, createMessage } from '@developer-agent/shared';
+import { A2AClient } from './a2a-client.js';
 
 /**
- * Agent Service - Manages Developer Agent lifecycle and query processing
- * Handles initialization, query routing, and agent coordination
+ * Agent Service - Manages A2A communication with Developer Agent
+ * Uses HTTP/JSON-RPC 2.0 to communicate with agent servers
  */
 export class AgentService {
-  private developerAgent: DeveloperAgent | null = null;
+  private developerAgentClient: A2AClient | null = null;
   private initialized = false;
+  private readonly DEVELOPER_AGENT_URL = 'http://localhost:3001';
 
   /**
    * Initialize the agent system
@@ -19,16 +19,38 @@ export class AgentService {
       return;
     }
 
-    // Initialize Developer Agent (it creates its own infrastructure)
-    this.developerAgent = new DeveloperAgent();
-    await this.developerAgent.init();
+    // Create A2A client for Developer Agent
+    this.developerAgentClient = new A2AClient(this.DEVELOPER_AGENT_URL);
+
+    // Verify Developer Agent is available (with retries for startup race conditions)
+    const maxRetries = 10;
+    const retryDelay = 1000; // 1 second
+    let isHealthy = false;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      isHealthy = await this.developerAgentClient.checkHealth();
+      if (isHealthy) {
+        break;
+      }
+      if (attempt < maxRetries) {
+        console.log(`⏳ Waiting for Developer Agent (attempt ${attempt}/${maxRetries})...`);
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      }
+    }
+
+    if (!isHealthy) {
+      throw new Error(
+        `Developer Agent not available at ${this.DEVELOPER_AGENT_URL} after ${maxRetries} attempts. ` +
+          'Make sure to start it with: npm run a2a -w developer-agent'
+      );
+    }
 
     this.initialized = true;
-    console.log('✅ Agent system initialized');
+    console.log('✅ Agent system initialized (A2A Protocol)');
   }
 
   /**
-   * Process a user query through the Developer Agent
+   * Process a user query through the Developer Agent via A2A Protocol
    * Emits WebSocket events for real-time progress updates
    */
   async processQuery(params: {
@@ -37,13 +59,15 @@ export class AgentService {
     userId: string;
     threadId: string;
   }): Promise<QueryResult> {
-    if (!this.initialized || !this.developerAgent) {
+    if (!this.initialized || !this.developerAgentClient) {
       throw new Error('Agent system not initialized');
     }
 
     const { queryId, query, userId, threadId } = params;
 
     try {
+      console.log(`[AgentService] Processing query ${queryId}:`, { query, userId, threadId });
+
       // Notify clients that processing has started
       websocketService.emitQueryProgress(threadId, queryId, 5, 'Starting query processing...');
 
@@ -53,16 +77,40 @@ export class AgentService {
         progress: 5,
       });
 
-      // Emit agent spawned event
-      websocketService.emitAgentSpawned(
+      // Send message to Developer Agent via A2A Protocol
+      websocketService.emitQueryProgress(
         threadId,
-        'DeveloperAgent',
-        this.developerAgent.getAgentId()
+        queryId,
+        10,
+        'Sending query to Developer Agent...'
       );
 
-      // Process query through Developer Agent
-      // We'll wrap this in a promise to handle progress tracking
-      const result = await this.processWithProgress(queryId, query, userId, threadId);
+      console.log('[AgentService] Calling developerAgentClient.sendMessage...');
+      const { task } = await this.developerAgentClient.sendMessage({
+        message: {
+          role: 'user',
+          parts: [
+            {
+              type: 'text',
+              text: query,
+            },
+          ],
+          contextId: threadId,
+          metadata: {
+            queryId,
+            userId,
+          },
+        },
+      });
+
+      console.log('[AgentService] Received task:', task.id, 'state:', task.status.state);
+      websocketService.emitAgentSpawned(threadId, 'DeveloperAgent', task.id);
+
+      // Poll for task completion
+      websocketService.emitQueryProgress(threadId, queryId, 30, 'Processing query...');
+      const result = await this.pollTaskCompletion(task.id, queryId, threadId);
+
+      console.log('[AgentService] Task completed:', task.id);
 
       // Mark as completed
       await updateQueryStatus({
@@ -72,6 +120,70 @@ export class AgentService {
         result,
       });
 
+      // Format and save assistant response to messages table
+      try {
+        let responseContent = '';
+
+        // Extract data from A2A Artifact format (same logic as frontend)
+        if (Array.isArray(result) && result.length > 0) {
+          const resultArtifact = result[0];
+          if (resultArtifact?.uri) {
+            const uriMatch = resultArtifact.uri.match(/^data:[^,]*,(.+)$/);
+            if (uriMatch) {
+              const dataPart = uriMatch[1];
+              let decodedJson: string;
+
+              if (resultArtifact.uri.includes('base64')) {
+                decodedJson = Buffer.from(dataPart, 'base64').toString('utf-8');
+              } else {
+                decodedJson = decodeURIComponent(dataPart);
+              }
+
+              const decodedResult = JSON.parse(decodedJson);
+
+              // Check if this is an LLM-based response with a synthesized answer
+              if (decodedResult.answer) {
+                // New LLM-based response format - use the synthesized answer
+                responseContent = decodedResult.answer;
+                console.log(
+                  `[AgentService] Using LLM synthesized answer (${responseContent.length} chars)`
+                );
+              } else if (decodedResult.results && decodedResult.results.length > 0) {
+                // Old workflow-based response format - format the raw data
+                for (const agentResult of decodedResult.results) {
+                  if (agentResult.agentType === 'github' && agentResult.data?.repositories) {
+                    const repos = agentResult.data.repositories;
+                    responseContent += `I found ${repos.length} repositories:\n\n`;
+                    for (const repo of repos) {
+                      responseContent += `• ${repo.fullName}\n`;
+                    }
+                  } else {
+                    responseContent += JSON.stringify(agentResult.data, null, 2);
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        if (!responseContent) {
+          responseContent = 'Query completed successfully.';
+        }
+
+        // Save assistant message to database
+        await createMessage({
+          conversationId: threadId,
+          role: 'assistant',
+          content: responseContent,
+          metadata: { queryId, agentType: 'system' },
+        });
+
+        console.log('[AgentService] Saved assistant response to database');
+      } catch (err) {
+        console.error('[AgentService] Failed to save assistant message:', err);
+        // Don't fail the query if message saving fails
+      }
+
       websocketService.emitQueryCompleted(threadId, queryId, 'completed', result);
 
       return {
@@ -79,7 +191,7 @@ export class AgentService {
         data: result,
       };
     } catch (error) {
-      console.error('Error processing query:', error);
+      console.error('[AgentService] Error processing query:', error);
 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
@@ -98,94 +210,62 @@ export class AgentService {
   }
 
   /**
-   * Process query with progress updates using AI
+   * Poll for task completion via A2A Protocol
    */
-  private async processWithProgress(
+  private async pollTaskCompletion(
+    taskId: string,
     queryId: string,
-    query: string,
-    userId: string,
     threadId: string
   ): Promise<unknown> {
-    if (!this.developerAgent) {
-      throw new Error('Developer agent not initialized');
+    if (!this.developerAgentClient) {
+      throw new Error('Developer agent client not initialized');
     }
 
-    const openaiService = getOpenAIService();
+    const maxAttempts = 60; // 60 seconds max
+    const pollInterval = 1000; // 1 second
 
-    // Emit status update
-    websocketService.emitAgentStatus(
-      threadId,
-      'DeveloperAgent',
-      this.developerAgent.getAgentId(),
-      'busy',
-      'Analyzing query with AI'
-    );
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const { task } = await this.developerAgentClient.getTask(taskId);
 
-    // Step 1: Decompose query using AI (10-30% progress)
-    websocketService.emitQueryProgress(
-      threadId,
-      queryId,
-      10,
-      'Using AI to decompose query into tasks...'
-    );
-    await updateQueryStatus({ queryId, status: 'processing', progress: 10 });
+      const progress = 30 + (attempt / maxAttempts) * 60; // 30-90%
+      websocketService.emitQueryProgress(
+        threadId,
+        queryId,
+        Math.floor(progress),
+        `Processing... (${task.status.state})`
+      );
 
-    // Get AI-powered task decomposition
-    const tasks = await openaiService.decomposeQuery(query);
+      websocketService.emitAgentStatus(
+        threadId,
+        'DeveloperAgent',
+        taskId,
+        task.status.state === 'working' ? 'busy' : 'idle',
+        task.status.message || `Task ${task.status.state}`
+      );
 
-    websocketService.emitQueryProgress(
-      threadId,
-      queryId,
-      30,
-      `Identified ${tasks.length} task(s) to execute`
-    );
+      if (task.status.state === 'completed') {
+        return task.artifacts || { status: 'completed', message: task.status.message };
+      }
 
-    // Step 2: Process with Developer Agent (30-80% progress)
-    websocketService.emitQueryProgress(
-      threadId,
-      queryId,
-      40,
-      'Executing tasks with specialized agents...'
-    );
-    await updateQueryStatus({ queryId, status: 'processing', progress: 40 });
+      if (task.status.state === 'failed') {
+        throw new Error(task.status.message || 'Task failed');
+      }
 
-    const result = await this.developerAgent.processQuery(query, userId, threadId);
+      if (task.status.state === 'canceled') {
+        throw new Error('Task was canceled');
+      }
 
-    // Step 3: Generate AI-enhanced response (80-95% progress)
-    websocketService.emitQueryProgress(threadId, queryId, 80, 'Generating intelligent response...');
+      // Wait before next poll
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    }
 
-    const aiResponse = await openaiService.generateResponse({
-      query,
-      context: JSON.stringify(result, null, 2),
-    });
-
-    websocketService.emitQueryProgress(threadId, queryId, 95, 'Finalizing results...');
-
-    // Emit final status
-    websocketService.emitAgentStatus(
-      threadId,
-      'DeveloperAgent',
-      this.developerAgent.getAgentId(),
-      'idle',
-      'Query completed successfully'
-    );
-
-    return {
-      query,
-      tasks,
-      agentResult: result,
-      aiResponse,
-      timestamp: new Date().toISOString(),
-    };
+    throw new Error('Task timed out');
   }
 
   /**
    * Shutdown the agent system
    */
-  async shutdown(): Promise<void> {
-    if (this.developerAgent) {
-      await this.developerAgent.shutdown();
-    }
+  shutdown(): void {
     this.initialized = false;
     console.log('🔴 Agent system shut down');
   }

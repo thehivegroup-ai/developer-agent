@@ -59,6 +59,11 @@ fastify.get('/', () => {
 // Start server
 const start = async () => {
   try {
+    // Initialize Agent service BEFORE starting the server
+    console.log('Initializing Agent service...');
+    const agentService = getAgentService();
+    await agentService.initialize();
+
     await fastify.listen({
       port: appConfig.PORT,
       host: '0.0.0.0',
@@ -66,10 +71,6 @@ const start = async () => {
 
     // Initialize WebSocket service with the HTTP server
     websocketService.initialize(fastify.server);
-
-    // Initialize Agent service
-    const agentService = getAgentService();
-    await agentService.initialize();
 
     console.log(`\n🚀 Server listening on port ${appConfig.PORT}`);
     console.log(`   Environment: ${appConfig.NODE_ENV}`);

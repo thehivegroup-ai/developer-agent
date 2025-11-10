@@ -5,7 +5,7 @@
   "type": "module",
   "main": "./src/index.ts",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx src/a2a-server.ts",
     "a2a": "tsx src/a2a-server.ts",
     "build": "tsc",
     "start": "node dist/index.js",

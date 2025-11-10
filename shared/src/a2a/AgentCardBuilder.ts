@@ -349,15 +349,19 @@ export class AgentCardTemplates {
    * Create a Repository Agent card template.
    *
    * @param baseUrl Base URL for the agent endpoint
-   * @param repoType Type of repository (e.g., 'angular', 'csharp-api')
+   * @param repoType Optional type of repository (e.g., 'node-api', 'angular', 'csharp-api'). If not provided, creates a generic repository agent.
    * @returns Agent Card Builder with template applied
    */
-  static repositoryAgent(baseUrl: string, repoType: string): AgentCardBuilder {
+  static repositoryAgent(baseUrl: string, repoType?: string): AgentCardBuilder {
+    const id = repoType ? `repository-agent-${repoType}` : 'repository-agent';
+    const name = repoType ? `Repository Agent (${repoType})` : 'Repository Agent';
+    const repoTypeDesc = repoType || 'code';
+
     return new AgentCardBuilder()
-      .setId(`repository-agent-${repoType}`)
-      .setName(`Repository Agent (${repoType})`)
+      .setId(id)
+      .setName(name)
       .setDescription(
-        `Analyzes ${repoType} repositories. Extracts code structure, dependencies, ` +
+        `Analyzes ${repoTypeDesc} repositories. Extracts code structure, dependencies, ` +
           'and architectural patterns specific to this technology stack.'
       )
       .addTransport({
@@ -371,9 +375,9 @@ export class AgentCardTemplates {
       })
       .addSkill({
         id: 'analyze-repository',
-        name: `Analyze ${repoType} Repository`,
+        name: `Analyze ${repoTypeDesc} Repository`,
         description:
-          `Performs deep analysis of ${repoType} repositories. Extracts code structure, ` +
+          `Performs deep analysis of ${repoTypeDesc} repositories. Extracts code structure, ` +
           'identifies patterns, analyzes dependencies, and generates insights.',
         inputSchema: {
           type: 'object',
@@ -391,7 +395,7 @@ export class AgentCardTemplates {
       .addSkill({
         id: 'extract-dependencies',
         name: 'Extract Dependencies',
-        description: `Identifies and extracts dependencies from ${repoType} project files.`,
+        description: `Identifies and extracts dependencies from ${repoTypeDesc} project files.`,
       });
   }
 

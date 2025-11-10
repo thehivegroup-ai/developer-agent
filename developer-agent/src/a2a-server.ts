@@ -13,6 +13,16 @@
  * - tasks/cancel - Cancel a running task
  */
 
+// Load environment variables from .env.local in workspace root
+import { config } from 'dotenv';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const workspaceRoot = join(__dirname, '..', '..');
+config({ path: join(workspaceRoot, '.env.local') });
+
 import express from 'express';
 import {
   JsonRpcTransport,
@@ -29,6 +39,7 @@ import {
   isTextPart,
   A2AErrorCode,
   createA2AError,
+  Artifact,
 } from '@developer-agent/shared';
 import { DeveloperAgent } from './index.js';
 import { randomUUID } from 'node:crypto';
@@ -123,12 +134,28 @@ export class DeveloperAgentA2AServer {
    * and returns the updated task.
    */
   private async handleMessageSend(params: MessageSendParams): Promise<MessageSendResult> {
-    if (this.config.enableLogging) {
-      console.log('[DeveloperAgent A2A] message/send received:', JSON.stringify(params, null, 2));
+    // Reduced logging: Only log in development
+    // console.log(`📨 message/send START`);
+
+    // Validate required parameters
+    if (!params.message) {
+      throw createA2AError(-32602, 'Missing required parameter: message');
+    }
+    if (!params.message.parts || !Array.isArray(params.message.parts)) {
+      throw createA2AError(-32602, 'Missing or invalid message.parts');
+    }
+    if (params.message.parts.length === 0) {
+      throw createA2AError(-32602, 'message.parts cannot be empty');
     }
 
-    // Extract message content
+    // Extract message content and top-level metadata (supports both locations per A2A spec flexibility)
     const { message, taskId } = params;
+    const paramsWithExtras = params as MessageSendParams & {
+      contextId?: string;
+      metadata?: Record<string, unknown>;
+    };
+    const contextId = paramsWithExtras.contextId;
+    const metadata = paramsWithExtras.metadata;
 
     // Get or create task
     let task;
@@ -136,10 +163,11 @@ export class DeveloperAgentA2AServer {
       // Continue existing task
       task = await this.taskManager.getTask(taskId);
     } else {
-      // Create new task
+      // Create new task with contextId and metadata from either message or top-level params
       task = await this.taskManager.createTask({
-        contextId: message.contextId,
+        contextId: contextId || message.contextId,
         message: 'Processing request',
+        metadata: metadata || message.metadata,
       });
     }
 
@@ -159,42 +187,84 @@ export class DeveloperAgentA2AServer {
       await this.taskManager.startTask(task.id, 'Processing message');
     }
 
+    // Extract text from message parts for validation
+    const textParts = a2aMessage.parts.filter(isTextPart);
+    const messageText = textParts.map((part) => part.text).join('\n');
+
+    if (!messageText) {
+      throw createA2AError(
+        A2AErrorCode.UNSUPPORTED_MESSAGE_FORMAT,
+        'Message must contain at least one text part'
+      );
+    }
+
+    // Reduced logging: Comment out verbose async start log
+    // console.log(`🚀 Async START ${task.id}`);
+
+    // Start async processing (don't wait for completion)
+    // This allows message/send to return quickly with task in WORKING state
+    this.processMessageAsync(task.id, messageText).catch((error) => {
+      console.error(`❌ Background error:`, error);
+    });
+
+    // Get current task state (should be WORKING)
+    task = await this.taskManager.getTask(task.id);
+
+    return {
+      task,
+      messageId: a2aMessage.messageId,
+    };
+  }
+
+  /**
+   * Process message asynchronously
+   */
+  private async processMessageAsync(taskId: string, messageText: string): Promise<void> {
     try {
-      // Extract text from message parts
-      const textParts = a2aMessage.parts.filter(isTextPart);
-      const messageText = textParts.map((part) => part.text).join('\n');
+      // Reduced logging: Comment out verbose process log
+      // console.log(`⚙️ processMessageAsync ${taskId}`);
 
-      if (!messageText) {
-        throw createA2AError(
-          A2AErrorCode.UNSUPPORTED_MESSAGE_FORMAT,
-          'Message must contain at least one text part'
-        );
-      }
-
-      // Process message with Developer Agent
-      // Note: This is a simplified integration - full integration would map
-      // the A2A message to the agent's internal message format
-      await this.agent.handleRequest({
-        query: messageText,
-        taskId: task.id,
+      // Process message with Developer Agent with 60 second timeout (increased)
+      const timeoutMs = 60000; // Increased from 25s to 60s
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          console.error(`⏰ TIMEOUT ${timeoutMs}ms`);
+          reject(new Error(`Request processing timed out after ${timeoutMs / 1000} seconds`));
+        }, timeoutMs);
       });
 
-      // Update task with result
-      await this.taskManager.completeTask(task.id, 'Request completed successfully', []);
+      // Reduced logging: Comment out verbose handleRequest log
+      // console.log(`🔄 calling agent.handleRequest`);
+      const result = await Promise.race([
+        this.agent.handleRequest({
+          query: messageText,
+          taskId: taskId,
+        }),
+        timeoutPromise,
+      ]);
+      // Reduced logging: Comment out verbose result dump
+      // console.log(`✅ Agent result:`, result);
 
-      // Get updated task
-      task = await this.taskManager.getTask(task.id);
+      // Add small delay to simulate processing time
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      return {
-        task,
-        messageId: a2aMessage.messageId,
-      };
+      // Create artifact from result
+      const artifacts: Artifact[] = [];
+      if (result) {
+        artifacts.push({
+          id: randomUUID(),
+          name: 'Query Result',
+          mimeType: 'application/json',
+          uri: `data:application/json;base64,${Buffer.from(JSON.stringify(result)).toString('base64')}`,
+          description: 'Result from developer agent query processing',
+        });
+      }
+
+      // Update task with result as artifacts
+      await this.taskManager.completeTask(taskId, 'Request completed successfully', artifacts);
     } catch (error) {
       // Mark task as failed
-      await this.taskManager.failTask(task.id, error as Error);
-
-      // Re-throw the error
-      throw error;
+      await this.taskManager.failTask(taskId, error as Error);
     }
   }
 
@@ -203,13 +273,8 @@ export class DeveloperAgentA2AServer {
    *
    * Retrieves task status by ID.
    */
-  private async handleTasksGet(params: TasksGetParams): Promise<TasksGetResult> {
-    if (this.config.enableLogging) {
-      console.log('[DeveloperAgent A2A] tasks/get received:', JSON.stringify(params, null, 2));
-    }
-
+  private async handleTasksGet(params: { taskId: string }): Promise<TasksGetResult> {
     const task = await this.taskManager.getTask(params.taskId);
-
     return { task };
   }
 
@@ -219,9 +284,10 @@ export class DeveloperAgentA2AServer {
    * Cancels a running task.
    */
   private async handleTasksCancel(params: TasksCancelParams): Promise<TasksCancelResult> {
-    if (this.config.enableLogging) {
-      console.log('[DeveloperAgent A2A] tasks/cancel received:', JSON.stringify(params, null, 2));
-    }
+    // Reduced logging: Only log in development if explicitly enabled
+    // if (this.config.enableLogging) {
+    //   console.log('[DeveloperAgent A2A] tasks/cancel received:', JSON.stringify(params, null, 2));
+    // }
 
     const task = await this.taskManager.cancelTask(params.taskId, params.reason);
 
@@ -332,6 +398,9 @@ async function main(): Promise<void> {
     console.log('\nShutting down...');
     void server.stop().then(() => process.exit(0));
   });
+
+  // Keep process alive - the HTTP server will handle requests
+  await new Promise(() => {}); // Never resolves, keeps event loop alive
 }
 
 // Run if this is the main module

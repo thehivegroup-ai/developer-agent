@@ -29,6 +29,8 @@ interface ChatContextType {
   selectConversation: (id: string) => Promise<void>;
   sendMessage: (message: string) => Promise<void>;
   refreshConversations: () => Promise<void>;
+  addAssistantMessage: (content: string, metadata?: Record<string, unknown>) => void;
+  setIsLoading: (loading: boolean) => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -124,6 +126,7 @@ export function ChatProvider({ children, username }: { children: ReactNode; user
     }
 
     try {
+      // Clear loading state for any previous message before starting new one
       setIsLoading(true);
 
       // Optimistically add user message to UI
@@ -135,7 +138,7 @@ export function ChatProvider({ children, username }: { children: ReactNode; user
         metadata: {},
         createdAt: new Date().toISOString(),
       };
-      setMessages([...messages, userMessage]);
+      setMessages((prev) => [...prev, userMessage]);
 
       const response = await axios.post<{
         queryId: string;
@@ -148,24 +151,51 @@ export function ChatProvider({ children, username }: { children: ReactNode; user
         message,
       });
 
-      console.log('Message sent, query ID:', response.data.queryId);
+      console.log('📤 Sent message:', message, 'Query ID:', response.data.queryId);
 
-      // Refresh messages after a delay to get the actual stored message
-      setTimeout(() => {
-        if (currentConversation) {
-          selectConversation(currentConversation.id);
-        }
-      }, 1000);
+      // ✅ Keep isLoading true - it will be cleared by query:completed WebSocket event
+      // The assistant response will be added by the query:completed WebSocket handler
 
       setError(null);
     } catch (err) {
       console.error('Failed to send message:', err);
       setError('Failed to send message');
+      setIsLoading(false); // Clear loading on error
       // Remove optimistic message on error
-      setMessages(messages.filter((m) => !m.id.startsWith('temp-')));
-    } finally {
-      setIsLoading(false);
+      setMessages((prev) => prev.filter((m) => !m.id.startsWith('temp-')));
     }
+  };
+
+  const addAssistantMessage = (content: string, metadata?: Record<string, unknown>) => {
+    // Only add message if we're still in the same conversation
+    // Check if metadata has conversationId and if it matches current conversation
+    if (
+      metadata?.conversationId &&
+      currentConversation &&
+      metadata.conversationId !== currentConversation.id
+    ) {
+      console.log(
+        '⚠️ Ignoring message for different conversation:',
+        metadata.conversationId,
+        'vs',
+        currentConversation.id
+      );
+      return;
+    }
+
+    const assistantMessage: Message = {
+      id: `assistant-${Date.now()}`,
+      role: 'assistant',
+      content,
+      agentType: 'system',
+      metadata: metadata || {},
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, assistantMessage]);
+    console.log(
+      `✅ Added assistant message to chat (${content.length} chars):`,
+      content.substring(0, 100)
+    );
   };
 
   return (
@@ -181,6 +211,8 @@ export function ChatProvider({ children, username }: { children: ReactNode; user
         selectConversation,
         sendMessage,
         refreshConversations,
+        addAssistantMessage,
+        setIsLoading,
       }}
     >
       {children}

@@ -284,7 +284,7 @@ describe('GitHub Agent A2A Server - Task Management', () => {
     });
 
     expect(response.error).toBeDefined();
-    expect(response.error?.code).toBe(-32001); // Task not found
+    expect(response.error?.code).toBe(-32602); // JSON-RPC INVALID_PARAMS for invalid task ID
   });
 
   it('should track task history', async () => {
@@ -388,7 +388,7 @@ describe('GitHub Agent A2A Server - Message Handling', () => {
     });
 
     expect(response.error).toBeDefined();
-    expect(response.error?.code).toBe(-32005); // Unsupported message format
+    expect(response.error?.code).toBe(-32602); // Invalid params (empty parts array)
   });
 
   it('should handle message with multiple text parts', async () => {

@@ -147,6 +147,7 @@ export async function chatRoutes(fastify: FastifyInstance) {
         } as SendMessageResponse);
 
         // Process query asynchronously (don't await - fire and forget)
+        console.log('[ChatRoute] Starting async query processing for:', queryId);
         const agentService = getAgentService();
         void agentService
           .processQuery({
@@ -155,7 +156,11 @@ export async function chatRoutes(fastify: FastifyInstance) {
             userId: user.id,
             threadId: conversation.id,
           })
+          .then(() => {
+            console.log('[ChatRoute] Query processing completed successfully:', queryId);
+          })
           .catch((error) => {
+            console.error('[ChatRoute] Error in async query processing:', queryId, error);
             fastify.log.error({ error, queryId }, 'Error in async query processing');
           });
       } catch (error) {

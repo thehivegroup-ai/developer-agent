@@ -163,8 +163,25 @@ export class JsonRpcTransport {
       });
     }
 
-    // Parse JSON bodies
+    // Parse JSON bodies with error handling
     router.use(express.json({ limit: this.config.maxBodySize }));
+
+    // Error handler for malformed JSON
+    router.use((err: unknown, _req: Request, res: Response, next: express.NextFunction) => {
+      if (err instanceof SyntaxError && 'body' in err) {
+        // Malformed JSON error
+        const errorResponse: JsonRpcErrorResponse = {
+          jsonrpc: '2.0',
+          error: {
+            code: JsonRpcErrorCode.PARSE_ERROR,
+            message: 'Parse error: Invalid JSON',
+          },
+          id: null,
+        };
+        return res.status(400).json(errorResponse);
+      }
+      return next(err);
+    });
 
     // Handle JSON-RPC requests
     router.post(this.config.basePath, async (req: Request, res: Response) => {

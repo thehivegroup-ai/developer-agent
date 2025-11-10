@@ -12,6 +12,9 @@ import {
   createWorkflowExecutor,
 } from '@developer-agent/shared';
 import type { Task } from '../../shared/src/state/AgentSystemState.js';
+import { ChatOpenAI } from '@langchain/openai';
+import { DynamicStructuredTool } from '@langchain/core/tools';
+import { z } from 'zod';
 
 // Developer Agent
 // Central orchestrator for agent activities
@@ -47,9 +50,29 @@ export class DeveloperAgent extends BaseDeveloperAgent {
   }
 
   async handleRequest(request: unknown): Promise<unknown> {
-    // Handle generic requests - delegate to appropriate method
+    console.log('🎯 handleRequest START');
     this.log('info', 'Received request', { request });
-    return { success: true, message: 'Request received' };
+
+    // Extract query from request
+    const req = request as { query: string; taskId?: string; userId?: string; threadId?: string };
+    if (!req.query) {
+      return { success: false, error: 'No query provided' };
+    }
+
+    // Use LLM-based processing with agent tools
+    const userId = req.userId || 'anonymous';
+    const threadId = req.threadId || req.taskId || 'default';
+
+    try {
+      const result = await this.processQueryWithLLM(req.query, userId, threadId);
+      return result;
+    } catch (error) {
+      this.log('error', 'Error in handleRequest', { error });
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
   }
 
   /**
@@ -167,41 +190,63 @@ export class DeveloperAgent extends BaseDeveloperAgent {
     this.setStatus('busy', 'Processing query with workflow');
 
     try {
+      console.log('🔧 [Developer Agent] Step 1: Creating initial state...');
       // Initialize state
       this.state = createInitialState(sessionId, threadId, userId, query);
       await this.checkpointManager.saveCheckpoint(sessionId, this.state);
 
-      // Import agents dynamically
-      const { GitHubAgent } = await import('@developer-agent/github-agent');
-      const { RelationshipAgent } = await import('@developer-agent/relationship-agent');
+      console.log('🔧 [Developer Agent] Step 2: Creating A2A proxy agents...');
+      // Import A2A Proxy Agent
+      const { A2AProxyAgent } = await import('./A2AProxyAgent.js');
 
-      // Create agents map
+      // Create agents map with A2A proxies
       const agents = new Map<string, IAgent>();
 
-      // Initialize GitHub Agent
-      const githubAgent = new GitHubAgent();
+      console.log('🔧 [Developer Agent] Step 3: Initializing GitHub Agent (A2A HTTP)...');
+      // Create A2A proxy for GitHub Agent (port 3002)
+      const githubAgent = new A2AProxyAgent('http://localhost:3002', {
+        agentId: 'github-agent',
+        agentType: 'github',
+        status: 'idle',
+        spawnedAt: new Date(),
+        lastActivityAt: new Date(),
+        ttlExpiresAt: new Date(Date.now() + 120 * 60 * 1000),
+      });
       await githubAgent.init();
       this.registerAgent(githubAgent);
       agents.set('github', githubAgent);
+      console.log('✅ GitHub Agent A2A proxy initialized');
 
       // Initialize Relationship Agent (optional - gracefully degrades if Neo4j unavailable)
+      console.log('🔧 [Developer Agent] Step 4: Initializing Relationship Agent (A2A HTTP)...');
       let relationshipAgent = null;
       try {
-        relationshipAgent = new RelationshipAgent();
+        relationshipAgent = new A2AProxyAgent('http://localhost:3004', {
+          agentId: 'relationship-agent',
+          agentType: 'relationship',
+          status: 'idle',
+          spawnedAt: new Date(),
+          lastActivityAt: new Date(),
+          ttlExpiresAt: new Date(Date.now() + 120 * 60 * 1000),
+        });
         await relationshipAgent.init();
         this.registerAgent(relationshipAgent);
         agents.set('relationship', relationshipAgent);
-        console.log('✅ Relationship Agent initialized');
+        console.log('✅ Relationship Agent A2A proxy initialized');
       } catch (error) {
         console.log(
-          '⚠️  Relationship Agent unavailable (Neo4j not running), skipping dependency graph'
+          '⚠️  Relationship Agent unavailable (server not running), skipping dependency graph'
         );
         relationshipAgent = null;
       }
 
+      console.log('🔧 [Developer Agent] Step 5: Creating workflow executor...');
       // Create and execute workflow (now using metadata-based analysis)
       const workflow = createWorkflowExecutor(agents);
+
+      console.log('🔧 [Developer Agent] Step 6: Executing workflow...');
       const finalState = await workflow.execute(this.state);
+      console.log('✅ [Developer Agent] Workflow execution completed');
 
       // Update state
       this.state = finalState;
@@ -236,6 +281,252 @@ export class DeveloperAgent extends BaseDeveloperAgent {
         await this.checkpointManager.saveCheckpoint(sessionId, this.state);
       }
 
+      this.setStatus('error', 'Query processing failed');
+      throw error;
+    }
+  }
+
+  /**
+   * Process query using LLM with agent tools
+   * The LLM understands the question and calls appropriate agent tools to gather data
+   */
+  async processQueryWithLLM(query: string, userId: string, threadId: string): Promise<unknown> {
+    const sessionId = uuidv4();
+
+    this.log('info', 'Processing query with LLM + tools', { query, userId, threadId, sessionId });
+    this.setStatus('busy', 'Processing query with LLM');
+
+    try {
+      // Initialize LLM
+      const llm = new ChatOpenAI({
+        modelName: 'gpt-4',
+        temperature: 0.7,
+        apiKey: process.env.OPENAI_API_KEY,
+      });
+
+      // Create A2A proxy agents (same as workflow approach)
+      const { A2AProxyAgent } = await import('./A2AProxyAgent.js');
+
+      const githubAgent = new A2AProxyAgent('http://localhost:3002', {
+        agentId: 'github-agent',
+        agentType: 'github',
+        status: 'idle',
+        spawnedAt: new Date(),
+        lastActivityAt: new Date(),
+        ttlExpiresAt: new Date(Date.now() + 120 * 60 * 1000),
+      });
+      await githubAgent.init();
+      this.registerAgent(githubAgent);
+
+      // Define tools for LLM
+      const tools = [
+        new DynamicStructuredTool({
+          name: 'list_repositories',
+          description:
+            'Get a list of ALL available GitHub repositories. When called without parameters, returns ALL repositories the system knows about. Can optionally filter by organization or topic.',
+          schema: z.object({
+            organization: z
+              .string()
+              .nullable()
+              .default('')
+              .describe(
+                'Optional: Filter by organization name like "cortside" or "thehivegroup-ai". Leave empty to see all repositories.'
+              ),
+            topic: z
+              .string()
+              .nullable()
+              .default('')
+              .describe(
+                'Optional: Filter by topic/tag like "react" or "typescript". Leave empty to see all repositories.'
+              ),
+          }),
+          func: async ({ organization, topic }) => {
+            console.log(`🔧 LLM calling list_repositories tool`, { organization, topic });
+
+            // Build query string for GitHub Agent (handle nullable/empty strings)
+            let query = '';
+            if (organization && organization.trim()) {
+              query += organization.trim();
+            }
+            if (topic && topic.trim()) {
+              query += (query ? ' ' : '') + topic.trim();
+            }
+
+            // Call GitHub Agent with proper action
+            // Pass empty string for query when no filters - GitHub Agent treats this as "list all"
+            const result = (await githubAgent.handleRequest({
+              action: 'discover',
+              query: query, // Empty string = list all repositories
+              limit: 50,
+            })) as any;
+
+            // GitHub Agent returns { repositories: [...] } directly
+            if (result?.repositories && Array.isArray(result.repositories)) {
+              // Filter by organization if specified
+              let repos = result.repositories;
+              if (organization && organization.trim()) {
+                const orgFilter = organization.trim().toLowerCase();
+                repos = repos.filter((r: any) => r.owner?.toLowerCase() === orgFilter);
+              }
+
+              console.log(`✅ Found ${repos.length} repositories`, {
+                organization,
+                topic,
+                totalFound: result.repositories.length,
+                filtered: repos.length,
+              });
+
+              return JSON.stringify(repos, null, 2);
+            }
+
+            console.log(`⚠️ No repositories found`, { organization, topic });
+            return JSON.stringify([]);
+          },
+        }),
+
+        new DynamicStructuredTool({
+          name: 'get_repository_details',
+          description:
+            'Get detailed information about a specific repository including programming languages, technologies, file structure, and dependencies.',
+          schema: z.object({
+            owner: z.string().describe('Repository owner (organization or user)'),
+            name: z.string().describe('Repository name'),
+          }),
+          func: async ({ owner, name }) => {
+            console.log(`🔧 LLM calling get_repository_details tool`, { owner, name });
+
+            // Call GitHub Agent with action: 'analyze'
+            const result = (await githubAgent.handleRequest({
+              action: 'analyze',
+              owner,
+              repo: name,
+            })) as any;
+
+            // GitHub Agent returns { repository: {...} } for analyze action
+            if (result?.repository) {
+              console.log(`✅ Found repository details for ${owner}/${name}`);
+              return JSON.stringify(result.repository, null, 2);
+            }
+
+            console.log(`⚠️ Repository not found: ${owner}/${name}`);
+            return JSON.stringify({ error: 'Repository not found' });
+          },
+        }),
+      ];
+
+      // Bind tools to LLM
+      const llmWithTools = llm.bindTools(tools);
+
+      // Invoke LLM with the user's question
+      console.log(`🤖 Invoking LLM with question: "${query}"`);
+      const response = await llmWithTools.invoke([
+        {
+          role: 'system',
+          content: `You are a helpful AI assistant that answers questions about GitHub repositories. 
+
+IMPORTANT: You have access to tools that provide real data. ALWAYS use these tools before answering:
+
+1. list_repositories - Call this to get ALL available repositories. When asked "what repositories", "list repositories", or similar questions, ALWAYS call this tool with empty parameters: {}
+2. get_repository_details - Call this to get specific details about a repository
+
+When the user asks questions like:
+- "what repositories are you aware of?" → Call list_repositories with {}
+- "what repositories do you have?" → Call list_repositories with {}  
+- "show me repositories" → Call list_repositories with {}
+- "repositories for cortside" → Call list_repositories with {organization: "cortside"}
+- "tell me about repo X" → Call get_repository_details
+
+DO NOT ask for more details if you can answer using the tools. The tools provide all the data you need.`,
+        },
+        {
+          role: 'user',
+          content: query,
+        },
+      ]);
+
+      console.log(`✅ LLM response received:`, response);
+
+      // Check if LLM wants to use tools
+      if (response.tool_calls && response.tool_calls.length > 0) {
+        console.log(`🔧 LLM wants to call ${response.tool_calls.length} tools`);
+
+        // Execute tool calls
+        const toolResults = [];
+        for (const toolCall of response.tool_calls) {
+          const tool = tools.find((t) => t.name === toolCall.name);
+          if (tool) {
+            console.log(`🔧 Executing tool: ${toolCall.name}`, toolCall.args);
+            const result = await tool.func(toolCall.args as any); // Type assertion needed for dynamic tool calls
+            toolResults.push({
+              tool_call_id: toolCall.id,
+              role: 'tool',
+              content: result,
+            });
+          }
+        }
+
+        // Get final answer from LLM with tool results
+        console.log(`🤖 Asking LLM to synthesize final answer with tool results`);
+        const finalResponse = await llm.invoke([
+          {
+            role: 'system',
+            content: `You are a helpful AI assistant. Synthesize the tool results into a clear, conversational answer to the user's question.`,
+          },
+          {
+            role: 'user',
+            content: query,
+          },
+          response,
+          ...toolResults,
+        ]);
+
+        console.log(`✅ Final LLM answer:`, finalResponse.content);
+
+        // Cleanup
+        await githubAgent.shutdown();
+        this.unregisterAgent(githubAgent.getMetadata().agentId);
+
+        this.setStatus('idle', 'Query completed');
+
+        return {
+          sessionId,
+          status: 'completed',
+          answer: finalResponse.content,
+          results: [
+            {
+              agentType: 'llm',
+              data: {
+                answer: finalResponse.content,
+                toolCalls: response.tool_calls?.map((tc) => tc.name),
+              },
+            },
+          ],
+        };
+      } else {
+        // LLM answered directly without tools
+        console.log(`✅ LLM answered directly without tools`);
+
+        await githubAgent.shutdown();
+        this.unregisterAgent(githubAgent.getMetadata().agentId);
+
+        this.setStatus('idle', 'Query completed');
+
+        return {
+          sessionId,
+          status: 'completed',
+          answer: response.content,
+          results: [
+            {
+              agentType: 'llm',
+              data: {
+                answer: response.content,
+              },
+            },
+          ],
+        };
+      }
+    } catch (error) {
+      this.log('error', 'Error processing query with LLM', { error });
       this.setStatus('error', 'Query processing failed');
       throw error;
     }

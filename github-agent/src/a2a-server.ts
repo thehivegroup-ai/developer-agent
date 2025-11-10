@@ -5,6 +5,16 @@
  * Provides HTTP endpoints for repository discovery and analysis via JSON-RPC 2.0.
  */
 
+// Load environment variables from .env.local in workspace root
+import { config } from 'dotenv';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const workspaceRoot = join(__dirname, '..', '..');
+config({ path: join(workspaceRoot, '.env.local') });
+
 import type { Server } from 'node:http';
 import type {
   TaskManager,
@@ -63,7 +73,7 @@ export class GitHubAgentA2AServer {
   constructor(config: GitHubAgentA2AServerConfig = {}) {
     this.config = {
       port: config.port ?? 3002,
-      enableLogging: config.enableLogging ?? true,
+      enableLogging: config.enableLogging ?? false, // Disabled by default - too verbose
       baseUrl: config.baseUrl ?? `http://localhost:${config.port ?? 3002}`,
     };
 
@@ -111,11 +121,30 @@ export class GitHubAgentA2AServer {
    * Creates or updates a task and processes the message through GitHub Agent.
    */
   private async handleMessageSend(params: MessageSendParams): Promise<MessageSendResult> {
-    if (this.config.enableLogging) {
-      console.log('[GitHubAgent A2A] message/send received:', JSON.stringify(params, null, 2));
+    // Reduced logging: Only log in development if explicitly enabled
+    // if (this.config.enableLogging) {
+    //   console.log('[GitHubAgent A2A] message/send received:', JSON.stringify(params, null, 2));
+    // }
+
+    // Validate required parameters
+    if (!params.message) {
+      throw createA2AError(-32602, 'Missing required parameter: message');
+    }
+    if (!params.message.parts || !Array.isArray(params.message.parts)) {
+      throw createA2AError(-32602, 'Missing or invalid message.parts');
+    }
+    if (params.message.parts.length === 0) {
+      throw createA2AError(-32602, 'message.parts cannot be empty');
     }
 
+    // Extract message content and top-level metadata (supports both locations per A2A spec flexibility)
     const { message, taskId } = params;
+    const paramsWithExtras = params as MessageSendParams & {
+      contextId?: string;
+      metadata?: Record<string, unknown>;
+    };
+    const contextId = paramsWithExtras.contextId;
+    const metadata = paramsWithExtras.metadata;
 
     // Validate message
     if (!message.parts || message.parts.length === 0) {
@@ -131,8 +160,9 @@ export class GitHubAgentA2AServer {
       task = await this.taskManager.getTask(taskId);
     } else {
       task = await this.taskManager.createTask({
-        contextId: message.contextId,
+        contextId: contextId || message.contextId,
         message: 'Processing GitHub operation',
+        metadata: metadata || message.metadata,
       });
     }
 
@@ -153,70 +183,142 @@ export class GitHubAgentA2AServer {
     }
 
     try {
-      // Extract text from message parts
+      // First check for data parts containing structured parameters (from A2A proxy)
+      const dataParts = a2aMessage.parts.filter((part) => part.type === 'data');
       const textParts = a2aMessage.parts.filter(isTextPart);
       const messageText = textParts.map((part) => part.text).join('\n');
-
-      if (!messageText) {
-        throw createA2AError(
-          A2AErrorCode.UNSUPPORTED_MESSAGE_FORMAT,
-          'Message must contain at least one text part'
-        );
-      }
-
-      // Parse the message to determine action
-      // Expected formats:
-      // - "search repositories: <query>"
-      // - "discover repository: <owner>/<repo>"
-      // - "analyze repository: <owner>/<repo>"
-      // - "detect repository type: <owner>/<repo>"
 
       let action: string;
       let parameters: Record<string, unknown> = {};
 
-      if (messageText.toLowerCase().startsWith('search repositories:')) {
-        action = 'discover';
-        const query = messageText.substring('search repositories:'.length).trim();
-        parameters = { query, limit: 10 };
-      } else if (messageText.toLowerCase().startsWith('discover repository:')) {
-        action = 'discover';
-        const repo = messageText.substring('discover repository:'.length).trim();
-        const [owner, repoName] = repo.split('/');
-        parameters = { owner, repo: repoName };
-      } else if (messageText.toLowerCase().startsWith('analyze repository:')) {
-        action = 'analyze';
-        const repo = messageText.substring('analyze repository:'.length).trim();
-        const [owner, repoName] = repo.split('/');
-        parameters = { owner, repo: repoName };
-      } else if (messageText.toLowerCase().startsWith('detect repository type:')) {
-        action = 'detectType';
-        const repo = messageText.substring('detect repository type:'.length).trim();
-        const [owner, repoName] = repo.split('/');
-        parameters = { owner, repo: repoName };
+      // Check if we have structured data from A2A proxy
+      if (dataParts.length > 0 && dataParts[0]?.data) {
+        const structuredData = dataParts[0].data as Record<string, unknown>;
+
+        // Extract action and parameters from data part
+        if (structuredData.action) {
+          action = structuredData.action as string;
+          // Copy all other fields as parameters (owner, repo, etc.)
+          parameters = { ...structuredData };
+          delete parameters.action; // Remove action from parameters
+        } else {
+          // Data part without action - treat as parameters for discover
+          action = 'discover';
+          parameters = structuredData;
+        }
+      } else if (!messageText) {
+        throw createA2AError(
+          A2AErrorCode.UNSUPPORTED_MESSAGE_FORMAT,
+          'Message must contain at least one text part or data part'
+        );
       } else {
-        // Default to search if no specific action
-        action = 'discover';
-        parameters = { query: messageText, limit: 10 };
+        // Fall back to text-based parsing (legacy format)
+        // Expected formats:
+        // - "search repositories: <query>"
+        // - "discover repository: <owner>/<repo>"
+        // - "analyze repository: <owner>/<repo>"
+        // - "detect repository type: <owner>/<repo>"
+
+        if (messageText.toLowerCase().startsWith('search repositories:')) {
+          action = 'discover';
+          const query = messageText.substring('search repositories:'.length).trim();
+          parameters = { query, limit: 10 };
+        } else if (messageText.toLowerCase().startsWith('discover repository:')) {
+          action = 'discover';
+          const repo = messageText.substring('discover repository:'.length).trim();
+          const [owner, repoName] = repo.split('/');
+          parameters = { owner, repo: repoName };
+        } else if (messageText.toLowerCase().startsWith('analyze repository:')) {
+          action = 'analyze';
+          const repo = messageText.substring('analyze repository:'.length).trim();
+          const [owner, repoName] = repo.split('/');
+          parameters = { owner, repo: repoName };
+        } else if (messageText.toLowerCase().startsWith('detect repository type:')) {
+          action = 'detectType';
+          const repo = messageText.substring('detect repository type:'.length).trim();
+          const [owner, repoName] = repo.split('/');
+          parameters = { owner, repo: repoName };
+        } else {
+          // Default to search if no specific action
+          action = 'discover';
+          parameters = { query: messageText, limit: 10 };
+        }
       }
 
       // Process message with GitHub Agent
-      // Note: This is a simplified integration - a full integration would
-      // properly map A2A messages to the agent's internal message format.
-      // For now, we'll execute the action directly and store result in task
       await this.taskManager.updateTaskStatus(task.id, {
         message: `Processing ${action} operation`,
         state: TaskState.WORKING,
       });
 
-      // Log the operation (in a real implementation, this would call the agent's methods)
-      if (this.config.enableLogging) {
-        console.log(`[GitHubAgent A2A] Executing ${action} with parameters:`, parameters);
-      }
+      // Reduced logging: Only log action, not full parameters
+      // if (this.config.enableLogging) {
+      //   console.log(`[GitHubAgent A2A] Executing ${action} with parameters:`, parameters);
+      // }
 
-      // Note: Task remains in WORKING state and must be completed/failed via subsequent calls
-      // This allows tasks to be canceled while in progress
+      // Execute the action through the GitHub Agent asynchronously
+      // Task will be polled for status via tasks/get
+      void (async () => {
+        try {
+          if (action === 'discover') {
+            const discoveryResult = await this.agent.discoverRepositories(
+              (parameters.query as string) || '',
+              (parameters.limit as number) || 10
+            );
 
-      // Get updated task
+            const repoCount = discoveryResult.repositories?.length || 0;
+            const message = discoveryResult.error
+              ? `Discovery completed with error: ${discoveryResult.error}`
+              : `Discovered ${repoCount} repositories`;
+
+            // Complete task with results stored in artifacts
+            await this.taskManager.completeTask(task.id, message, [
+              {
+                id: `artifact-${Date.now()}`,
+                name: 'discovery-results.json',
+                mimeType: 'application/json',
+                uri: `data:application/json,${encodeURIComponent(JSON.stringify(discoveryResult))}`,
+                description: 'Repository discovery results',
+              },
+            ]);
+          } else if (action === 'analyze') {
+            // Analyze repository with owner and repo parameters
+            const owner = parameters.owner as string;
+            const repo = parameters.repo as string;
+
+            if (!owner || !repo) {
+              throw new Error('Missing required parameters: owner and repo');
+            }
+
+            const analysisResult = await this.agent.handleRequest({
+              action: 'analyze',
+              owner,
+              repo,
+            });
+
+            const message = `Analyzed repository ${owner}/${repo}`;
+
+            // Complete task with results stored in artifacts
+            await this.taskManager.completeTask(task.id, message, [
+              {
+                id: `artifact-${Date.now()}`,
+                name: 'analysis-results.json',
+                mimeType: 'application/json',
+                uri: `data:application/json,${encodeURIComponent(JSON.stringify(analysisResult))}`,
+                description: 'Repository analysis results',
+              },
+            ]);
+          } else {
+            // For other actions, mark as not yet implemented
+            await this.taskManager.completeTask(task.id, `Action '${action}' not yet implemented`);
+          }
+        } catch (actionError) {
+          // Failed to execute action
+          await this.taskManager.failTask(task.id, actionError as Error);
+        }
+      })();
+
+      // Get updated task (will be in WORKING state initially)
       task = await this.taskManager.getTask(task.id);
 
       return {
@@ -238,9 +340,10 @@ export class GitHubAgentA2AServer {
    * Retrieves task status by ID.
    */
   private async handleTasksGet(params: TasksGetParams): Promise<TasksGetResult> {
-    if (this.config.enableLogging) {
-      console.log('[GitHubAgent A2A] tasks/get received:', JSON.stringify(params, null, 2));
-    }
+    // Reduced logging: Only log in development if explicitly enabled
+    // if (this.config.enableLogging) {
+    //   console.log('[GitHubAgent A2A] tasks/get received:', JSON.stringify(params, null, 2));
+    // }
 
     const task = await this.taskManager.getTask(params.taskId);
 
@@ -253,9 +356,10 @@ export class GitHubAgentA2AServer {
    * Cancels a running task.
    */
   private async handleTasksCancel(params: TasksCancelParams): Promise<TasksCancelResult> {
-    if (this.config.enableLogging) {
-      console.log('[GitHubAgent A2A] tasks/cancel received:', JSON.stringify(params, null, 2));
-    }
+    // Reduced logging: Only log in development if explicitly enabled
+    // if (this.config.enableLogging) {
+    //   console.log('[GitHubAgent A2A] tasks/cancel received:', JSON.stringify(params, null, 2));
+    // }
 
     const task = await this.taskManager.cancelTask(params.taskId, params.reason);
 
@@ -318,6 +422,7 @@ export class GitHubAgentA2AServer {
  * Main entry point for standalone execution.
  */
 async function main(): Promise<void> {
+  console.log('🚀 GitHub Agent A2A Server starting...');
   const server = new GitHubAgentA2AServer({
     enableLogging: true,
   });
@@ -334,6 +439,9 @@ async function main(): Promise<void> {
     console.log('\nShutting down...');
     void server.stop().then(() => process.exit(0));
   });
+
+  // Keep process alive - the HTTP server will handle requests
+  await new Promise(() => {}); // Never resolves, keeps event loop alive
 }
 
 // Run if executed directly
