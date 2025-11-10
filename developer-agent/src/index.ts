@@ -387,7 +387,7 @@ export class DeveloperAgent extends BaseDeveloperAgent {
         new DynamicStructuredTool({
           name: 'get_repository_details',
           description:
-            'Get detailed information about a specific repository including programming languages, technologies, file structure, and dependencies.',
+            'Get METADATA about a repository: description, languages used, stars, forks, last updated date. Does NOT analyze code or extract dependencies. For dependency analysis, you MUST use get_repository_dependencies instead.',
           schema: z.object({
             owner: z.string().describe('Repository owner (organization or user)'),
             name: z.string().describe('Repository name'),
@@ -405,11 +405,117 @@ export class DeveloperAgent extends BaseDeveloperAgent {
             // GitHub Agent returns { repository: {...} } for analyze action
             if (result?.repository) {
               console.log(`✅ Found repository details for ${owner}/${name}`);
-              return JSON.stringify(result.repository, null, 2);
+              const repo = result.repository;
+              // Add a note if this looks like a dependency query
+              const response = {
+                ...repo,
+                note: 'This is metadata only. For dependency analysis, use get_repository_dependencies tool.',
+              };
+              return JSON.stringify(response, null, 2);
             }
 
             console.log(`⚠️ Repository not found: ${owner}/${name}`);
             return JSON.stringify({ error: 'Repository not found' });
+          },
+        }),
+
+        new DynamicStructuredTool({
+          name: 'get_repository_dependencies',
+          description:
+            'Analyze a repository to extract its dependencies. This spawns a specialized repository agent (Node.js, C#, etc.) to analyze package files and return detailed dependency information.',
+          schema: z.object({
+            owner: z.string().describe('Repository owner (organization or user)'),
+            name: z.string().describe('Repository name'),
+          }),
+          func: async ({ owner, name }) => {
+            console.log(`🔧 LLM calling get_repository_dependencies tool`, { owner, name });
+
+            try {
+              // First, get repository info to determine type
+              const repoResult = (await githubAgent.handleRequest({
+                action: 'analyze',
+                owner,
+                repo: name,
+              })) as any;
+
+              if (!repoResult?.repository) {
+                return JSON.stringify({ error: 'Repository not found' });
+              }
+
+              const repo = repoResult.repository;
+              const primaryLanguage = repo.primaryLanguage?.toLowerCase() || '';
+              const defaultBranch = repo.defaultBranch || 'main';
+
+              console.log(
+                `   📦 Analyzing dependencies for ${owner}/${name} (${primaryLanguage}, branch: ${defaultBranch})`
+              );
+
+              // Spawn appropriate repository agent based on language
+              let repositoryAgent: IAgent | null = null;
+
+              if (
+                primaryLanguage === 'typescript' ||
+                primaryLanguage === 'javascript' ||
+                repo.repositoryType === 'node-api'
+              ) {
+                // Use Node API Agent
+                const { NodeApiAgent } = await import('@developer-agent/repository-agents');
+                repositoryAgent = new NodeApiAgent(`${owner}/${name}`);
+                await repositoryAgent.init();
+
+                console.log(`   ✅ Spawned Node API Agent for ${owner}/${name}`);
+              } else if (primaryLanguage === 'c#' || repo.repositoryType === 'csharp-library') {
+                // Spawn C# Library Agent for C# repositories
+                const { CSharpLibraryAgent } = await import('@developer-agent/repository-agents');
+                repositoryAgent = new CSharpLibraryAgent(`${owner}/${name}`);
+                await repositoryAgent.init();
+
+                console.log(`   ✅ Spawned C# Library Agent for ${owner}/${name}`);
+              } else {
+                return JSON.stringify({
+                  message: `Dependency analysis for ${primaryLanguage} repositories not yet supported`,
+                  repository: `${owner}/${name}`,
+                  language: primaryLanguage,
+                });
+              }
+
+              if (repositoryAgent) {
+                // Call the repository agent to extract dependencies with the correct branch
+                const analysisResult = (await repositoryAgent.handleRequest({
+                  action: 'analyze',
+                  owner,
+                  repo: name,
+                  branch: defaultBranch,
+                })) as any;
+
+                await repositoryAgent.shutdown();
+
+                if (analysisResult?.error) {
+                  return JSON.stringify({
+                    error: analysisResult.error,
+                    repository: `${owner}/${name}`,
+                  });
+                }
+
+                console.log(
+                  `   ✅ Extracted ${analysisResult.dependencies?.length || 0} dependencies`
+                );
+                return JSON.stringify({
+                  repository: `${owner}/${name}`,
+                  framework: analysisResult.framework,
+                  dependencies: analysisResult.dependencies,
+                  dependencyCount: analysisResult.dependencies?.length || 0,
+                });
+              }
+
+              return JSON.stringify({ error: 'Could not spawn repository agent' });
+            } catch (error) {
+              console.error(`   ❌ Error analyzing dependencies:`, error);
+              return JSON.stringify({
+                error: error instanceof Error ? error.message : 'Unknown error',
+                repository: `${owner}/${name}`,
+              });
+            }
           },
         }),
       ];
@@ -426,15 +532,26 @@ export class DeveloperAgent extends BaseDeveloperAgent {
 
 IMPORTANT: You have access to tools that provide real data. ALWAYS use these tools before answering:
 
-1. list_repositories - Call this to get ALL available repositories. When asked "what repositories", "list repositories", or similar questions, ALWAYS call this tool with empty parameters: {}
-2. get_repository_details - Call this to get specific details about a repository
+1. list_repositories - Get ALL available repositories
+2. get_repository_details - Get METADATA ONLY (languages, last updated, description, stars)
+3. get_repository_dependencies - Analyze repository CODE to extract dependencies (spawns specialized agent)
 
-When the user asks questions like:
-- "what repositories are you aware of?" → Call list_repositories with {}
-- "what repositories do you have?" → Call list_repositories with {}  
-- "show me repositories" → Call list_repositories with {}
-- "repositories for cortside" → Call list_repositories with {organization: "cortside"}
-- "tell me about repo X" → Call get_repository_details
+TOOL SELECTION RULES:
+- User asks "what repos?" → use list_repositories
+- User asks "tell me about repo X" or "what language is X?" → use get_repository_details (metadata)
+- User asks "what dependencies?" or "what packages?" or "analyze dependencies" → use get_repository_dependencies (code analysis)
+
+Examples:
+- "what repositories are you aware of?" → list_repositories {}
+- "what repositories do you have?" → list_repositories {}
+- "repositories for cortside" → list_repositories {organization: "cortside"}
+- "tell me about cortside/cortside.aspnetcore" → get_repository_details
+- "what language is cortside/cortside.aspnetcore?" → get_repository_details
+- "what dependencies does thehivegroup-ai/guidelines-extension have?" → get_repository_dependencies
+- "what packages does cortside/cortside.aspnetcore use?" → get_repository_dependencies
+- "analyze dependencies for repo X" → get_repository_dependencies
+
+CRITICAL: For ANY question about dependencies, packages, or libraries that a repository uses, you MUST call get_repository_dependencies, NOT get_repository_details.
 
 DO NOT ask for more details if you can answer using the tools. The tools provide all the data you need.`,
         },

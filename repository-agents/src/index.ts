@@ -24,3 +24,6 @@ export class RepositoryAgentAngular extends BaseRepositoryAgentAngular {
 
 // Export Node API Agent
 export { NodeApiAgent } from './NodeApiAgent.js';
+
+// Export C# Library Agent
+export { CSharpLibraryAgent } from './CSharpLibraryAgent.js';
