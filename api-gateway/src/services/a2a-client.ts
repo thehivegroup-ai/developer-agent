@@ -122,7 +122,7 @@ export class A2AClient {
   }
 
   /**
-   * Call a JSON-RPC method
+   * Call a JSON-RPC method with a long timeout for task polling
    */
   private async callMethod<T>(method: string, params?: unknown): Promise<T> {
     const requestId = ++this.requestId;
@@ -134,26 +134,36 @@ export class A2AClient {
       id: requestId,
     };
 
-    const response = await fetch(this.baseUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(request),
-    });
+    // Set a long timeout (5 minutes) for individual HTTP requests
+    // The polling loop will handle overall task timeout based on agent responsiveness
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 300000); // 5 minutes
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    try {
+      const response = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const jsonRpcResponse = (await response.json()) as JsonRpcResponse;
+
+      if (jsonRpcResponse.error) {
+        throw new Error(
+          `JSON-RPC Error ${jsonRpcResponse.error.code}: ${jsonRpcResponse.error.message}`
+        );
+      }
+
+      return jsonRpcResponse.result as T;
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const jsonRpcResponse = (await response.json()) as JsonRpcResponse;
-
-    if (jsonRpcResponse.error) {
-      throw new Error(
-        `JSON-RPC Error ${jsonRpcResponse.error.code}: ${jsonRpcResponse.error.message}`
-      );
-    }
-
-    return jsonRpcResponse.result as T;
   }
 }

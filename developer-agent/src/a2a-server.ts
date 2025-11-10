@@ -224,8 +224,9 @@ export class DeveloperAgentA2AServer {
       // Reduced logging: Comment out verbose process log
       // console.log(`⚙️ processMessageAsync ${taskId}`);
 
-      // Process message with Developer Agent with 60 second timeout (increased)
-      const timeoutMs = 60000; // Increased from 25s to 60s
+      // Process message with Developer Agent with 5 minute timeout
+      // API Gateway handles overall timeout with stale detection (2 min no response)
+      const timeoutMs = 300000; // 5 minutes - long enough for complex operations
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => {
           console.error(`⏰ TIMEOUT ${timeoutMs}ms`);

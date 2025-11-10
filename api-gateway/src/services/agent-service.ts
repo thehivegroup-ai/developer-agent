@@ -1,5 +1,9 @@
 import { websocketService } from './websocket-service.js';
-import { updateQueryStatus, createMessage } from '@developer-agent/shared';
+import {
+  updateQueryStatus,
+  createMessage,
+  getMessagesByConversation,
+} from '@developer-agent/shared';
 import { A2AClient } from './a2a-client.js';
 
 /**
@@ -77,6 +81,26 @@ export class AgentService {
         progress: 5,
       });
 
+      // Load conversation history to provide context
+      websocketService.emitQueryProgress(threadId, queryId, 7, 'Loading conversation history...');
+
+      const conversationHistory = await getMessagesByConversation(threadId, 20); // Get last 20 messages
+      console.log(
+        `[AgentService] Loaded ${conversationHistory.length} previous messages for context`
+      );
+
+      // Build context string from conversation history (exclude the current message which is at the end)
+      let contextString = '';
+      if (conversationHistory.length > 0) {
+        // Take all messages except the last one (which is the current user message)
+        const historyMessages = conversationHistory.slice(0, -1);
+        if (historyMessages.length > 0) {
+          contextString = historyMessages
+            .map((msg) => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+            .join('\n\n');
+        }
+      }
+
       // Send message to Developer Agent via A2A Protocol
       websocketService.emitQueryProgress(
         threadId,
@@ -92,7 +116,9 @@ export class AgentService {
           parts: [
             {
               type: 'text',
-              text: query,
+              text: contextString
+                ? `Previous conversation:\n${contextString}\n\nCurrent question: ${query}`
+                : query,
             },
           ],
           contextId: threadId,
@@ -211,6 +237,7 @@ export class AgentService {
 
   /**
    * Poll for task completion via A2A Protocol
+   * Only times out if agent stops responding, not while actively working
    */
   private async pollTaskCompletion(
     taskId: string,
@@ -221,45 +248,64 @@ export class AgentService {
       throw new Error('Developer agent client not initialized');
     }
 
-    const maxAttempts = 60; // 60 seconds max
     const pollInterval = 1000; // 1 second
+    const maxStaleTime = 120000; // 2 minutes without any response = stale/hung task
 
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const { task } = await this.developerAgentClient.getTask(taskId);
+    let lastResponseTime = Date.now();
+    let attempt = 0;
 
-      const progress = 30 + (attempt / maxAttempts) * 60; // 30-90%
-      websocketService.emitQueryProgress(
-        threadId,
-        queryId,
-        Math.floor(progress),
-        `Processing... (${task.status.state})`
-      );
+    while (true) {
+      attempt++;
 
-      websocketService.emitAgentStatus(
-        threadId,
-        'DeveloperAgent',
-        taskId,
-        task.status.state === 'working' ? 'busy' : 'idle',
-        task.status.message || `Task ${task.status.state}`
-      );
+      try {
+        const { task } = await this.developerAgentClient.getTask(taskId);
+        lastResponseTime = Date.now(); // Got a response, reset stale timer
 
-      if (task.status.state === 'completed') {
-        return task.artifacts || { status: 'completed', message: task.status.message };
-      }
+        const progress = Math.min(30 + attempt * 2, 90); // 30-90%
+        websocketService.emitQueryProgress(
+          threadId,
+          queryId,
+          Math.floor(progress),
+          `Processing... (${task.status.state})`
+        );
 
-      if (task.status.state === 'failed') {
-        throw new Error(task.status.message || 'Task failed');
-      }
+        websocketService.emitAgentStatus(
+          threadId,
+          'DeveloperAgent',
+          taskId,
+          task.status.state === 'working' ? 'busy' : 'idle',
+          task.status.message || `Task ${task.status.state}`
+        );
 
-      if (task.status.state === 'canceled') {
-        throw new Error('Task was canceled');
+        // Check for terminal states
+        if (task.status.state === 'completed') {
+          return task.artifacts || { status: 'completed', message: task.status.message };
+        }
+
+        if (task.status.state === 'failed') {
+          throw new Error(task.status.message || 'Task failed');
+        }
+
+        if (task.status.state === 'canceled') {
+          throw new Error('Task was canceled');
+        }
+
+        // Task is still working - continue polling
+        // No hard timeout as long as agent is responding
+      } catch (error) {
+        // If we can't reach the agent, check if it's been too long
+        const timeSinceLastResponse = Date.now() - lastResponseTime;
+        if (timeSinceLastResponse > maxStaleTime) {
+          console.error('[AgentService] Task appears stale (no response for 2+ minutes)');
+          throw new Error('Task timed out - agent not responding');
+        }
+        // Otherwise, log the error and keep trying
+        console.warn('[AgentService] Error polling task, will retry:', error);
       }
 
       // Wait before next poll
       await new Promise((resolve) => setTimeout(resolve, pollInterval));
     }
-
-    throw new Error('Task timed out');
   }
 
   /**

@@ -13,6 +13,9 @@ interface CsProjDependency {
     | 'logging'
     | 'serialization'
     | 'other';
+  type: 'package' | 'project'; // Package reference or project reference
+  isInternal: boolean; // True if from same organization/namespace
+  projectPath?: string; // For project references, the relative path
 }
 
 interface AnalysisResult {
@@ -122,12 +125,16 @@ export class CSharpLibraryAgent extends BaseAgent {
         }
 
         // Parse dependencies from this .csproj
-        const dependencies = this.parseCsProjDependencies(csprojContent);
+        const dependencies = this.parseCsProjDependencies(csprojContent, owner, repo);
 
         // Merge dependencies (use Map to deduplicate by name, keeping highest version)
         for (const dep of dependencies) {
           const existing = allDependencies.get(dep.name);
-          if (!existing || this.compareVersions(dep.version, existing.version) > 0) {
+          // For project references, always add (don't deduplicate)
+          // For packages, keep highest version
+          if (dep.type === 'project') {
+            allDependencies.set(`${dep.name}-${dep.projectPath}`, dep);
+          } else if (!existing || this.compareVersions(dep.version, existing.version) > 0) {
             allDependencies.set(dep.name, dep);
           }
         }
@@ -200,12 +207,16 @@ export class CSharpLibraryAgent extends BaseAgent {
   }
 
   /**
-   * Parse .csproj XML to extract PackageReference dependencies
+   * Parse .csproj XML to extract both PackageReference and ProjectReference dependencies
    */
-  private parseCsProjDependencies(csprojXml: string): CsProjDependency[] {
+  private parseCsProjDependencies(
+    csprojXml: string,
+    owner: string,
+    _repo: string
+  ): CsProjDependency[] {
     const dependencies: CsProjDependency[] = [];
 
-    // Simple regex-based XML parsing (could use xml2js for more robust parsing)
+    // Parse PackageReference elements
     // Match <PackageReference Include="PackageName" Version="1.2.3" />
     const packageReferenceRegex =
       /<PackageReference\s+Include="([^"]+)"\s+Version="([^"]+)"\s*\/>/gi;
@@ -215,20 +226,92 @@ export class CSharpLibraryAgent extends BaseAgent {
       const name = match[1];
       const version = match[2];
 
-      if (!name || !version) continue; // Skip if either is undefined
+      if (!name || !version) continue;
 
       const category = this.categorizeDependency(name);
       const isDev = this.isDevDependency(name);
+      const isInternal = this.isInternalDependency(name, owner);
 
       dependencies.push({
         name,
         version,
         isDev,
         category,
+        type: 'package',
+        isInternal,
+      });
+    }
+
+    // Parse ProjectReference elements
+    // Match <ProjectReference Include="..\ProjectName\ProjectName.csproj" />
+    const projectReferenceRegex = /<ProjectReference\s+Include="([^"]+)"\s*\/>/gi;
+
+    while ((match = projectReferenceRegex.exec(csprojXml)) !== null) {
+      const projectPath = match[1];
+
+      if (!projectPath) continue;
+
+      // Extract project name from path (e.g., "..\ProjectName\ProjectName.csproj" -> "ProjectName")
+      const projectName = this.extractProjectName(projectPath);
+
+      dependencies.push({
+        name: projectName,
+        version: 'project-reference',
+        isDev: false,
+        category: 'other',
+        type: 'project',
+        isInternal: true, // Project references are always internal
+        projectPath,
       });
     }
 
     return dependencies;
+  }
+
+  /**
+   * Extract project name from project reference path
+   * Examples:
+   *   "..\ProjectName\ProjectName.csproj" -> "ProjectName"
+   *   "..\Cortside.AspNetCore\Cortside.AspNetCore.csproj" -> "Cortside.AspNetCore"
+   */
+  private extractProjectName(projectPath: string): string {
+    // Remove .csproj extension
+    const withoutExtension = projectPath.replace(/\.csproj$/i, '');
+
+    // Split by path separators (both \ and /)
+    const parts = withoutExtension.split(/[/\\]/);
+
+    // Return the last part (project name)
+    return parts[parts.length - 1] || projectPath;
+  }
+
+  /**
+   * Check if a package dependency is internal (from same organization)
+   * Internal packages typically:
+   * - Share the same namespace prefix (e.g., "Cortside.*")
+   * - Come from the same GitHub organization
+   */
+  private isInternalDependency(packageName: string, owner: string): boolean {
+    const nameLower = packageName.toLowerCase();
+    const ownerLower = owner.toLowerCase();
+
+    // Check if package name starts with owner name
+    // Examples:
+    //   Owner: "cortside", Package: "Cortside.Common.Messages" -> true
+    //   Owner: "cortside", Package: "Microsoft.AspNetCore" -> false
+    if (nameLower.startsWith(ownerLower + '.')) {
+      return true;
+    }
+
+    // Check if package name contains owner name as a namespace segment
+    // Examples:
+    //   Owner: "cortside", Package: "Cortside.AspNetCore.Swagger" -> true
+    const nameParts = nameLower.split('.');
+    if (nameParts[0] === ownerLower) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
