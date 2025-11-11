@@ -3,6 +3,8 @@ import {
   updateQueryStatus,
   createMessage,
   getMessagesByConversation,
+  getQuery,
+  logAgentActivity,
 } from '@developer-agent/shared';
 import { A2AClient } from './a2a-client.js';
 
@@ -145,6 +147,29 @@ export class AgentService {
         progress: 100,
         result,
       });
+
+      // Compute total duration of completed task and log agent activity
+      try {
+        const queryRecord = await getQuery(queryId);
+        if (queryRecord && queryRecord.completedAt) {
+          const start = queryRecord.createdAt || new Date();
+          const end = queryRecord.completedAt;
+          const durationMs = end.getTime() - start.getTime();
+          const durationSeconds = Math.round(durationMs / 1000);
+
+          // Log agent activity for completion with duration
+          await logAgentActivity({
+            queryId,
+            conversationId: threadId,
+            eventType: 'task_completed',
+            agentType: 'DeveloperAgent',
+            agentId: 'DeveloperAgent',
+            data: { durationSeconds, durationMs },
+          });
+        }
+      } catch (err) {
+        console.warn('[AgentService] Failed to record task duration', err);
+      }
 
       // Format and save assistant response to messages table
       try {

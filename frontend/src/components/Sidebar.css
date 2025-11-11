@@ -193,6 +193,15 @@
   background: #333;
 }
 
+.conversation-actions button.delete-button {
+  color: #ef4444;
+}
+
+.conversation-actions button.delete-button:hover {
+  background: #dc2626;
+  color: white;
+}
+
 /* Scrollbar styling */
 .conversations-list::-webkit-scrollbar {
   width: 6px;

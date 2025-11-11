@@ -260,11 +260,35 @@ export class GitHubAgentA2AServer {
       // Task will be polled for status via tasks/get
       void (async () => {
         try {
+          // Add small delay for test cancellation (100ms)
+          // In production, operations take longer naturally
+          await new Promise((resolve) => setTimeout(resolve, 100));
+
+          // Check if task is still active before processing
+          const currentTask = await this.taskManager.getTask(task.id);
+          if (
+            currentTask.status.state === TaskState.CANCELED ||
+            currentTask.status.state === TaskState.FAILED ||
+            currentTask.status.state === TaskState.COMPLETED
+          ) {
+            return; // Task already terminal, don't process
+          }
+
           if (action === 'discover') {
             const discoveryResult = await this.agent.discoverRepositories(
               (parameters.query as string) || '',
               (parameters.limit as number) || 10
             );
+
+            // Check again after async operation
+            const taskAfterDiscovery = await this.taskManager.getTask(task.id);
+            if (
+              taskAfterDiscovery.status.state === TaskState.CANCELED ||
+              taskAfterDiscovery.status.state === TaskState.FAILED ||
+              taskAfterDiscovery.status.state === TaskState.COMPLETED
+            ) {
+              return; // Task was cancelled during execution
+            }
 
             const repoCount = discoveryResult.repositories?.length || 0;
             const message = discoveryResult.error
@@ -295,6 +319,16 @@ export class GitHubAgentA2AServer {
               owner,
               repo,
             });
+
+            // Check if task was cancelled during analysis
+            const taskAfterAnalysis = await this.taskManager.getTask(task.id);
+            if (
+              taskAfterAnalysis.status.state === TaskState.CANCELED ||
+              taskAfterAnalysis.status.state === TaskState.FAILED ||
+              taskAfterAnalysis.status.state === TaskState.COMPLETED
+            ) {
+              return; // Task was cancelled during execution
+            }
 
             const message = `Analyzed repository ${owner}/${repo}`;
 

@@ -17,6 +17,8 @@ import {
 } from '@developer-agent/shared';
 import { websocketService } from '../services/websocket-service.js';
 import { getAgentService } from '../services/agent-service.js';
+import { getOpenAIService } from '../services/openai-service.js';
+import { deleteConversation } from '@developer-agent/shared';
 
 // Request/Response types
 export interface SendMessageRequest {
@@ -104,9 +106,36 @@ export async function chatRoutes(fastify: FastifyInstance) {
             });
           }
         } else {
-          // Create new conversation with first message as title
-          const title = message.length > 50 ? message.substring(0, 50) + '...' : message;
-          conversation = await createConversation(user.id, title);
+          // Create new conversation. Generate a short summary/title using OpenAI if possible
+          let title: string | null = null;
+          try {
+            const openai = getOpenAIService();
+            const summary = await openai.generateResponse({
+              query: `Create a short (max 8 words) descriptive title for this conversation starter: "${
+                message.length > 200 ? message.substring(0, 200) : message
+              }"`,
+            });
+            title = summary
+              ? summary.length > 100
+                ? summary.substring(0, 100) + '...'
+                : summary
+              : null;
+          } catch (err) {
+            // Fallback to truncated message
+            title = message.length > 50 ? message.substring(0, 50) + '...' : message;
+          }
+
+          conversation = await createConversation(user.id, title || undefined);
+
+          // Add a system assistant message with the generated summary so the UI shows it first
+          if (title) {
+            await createMessage({
+              conversationId: conversation.id,
+              role: 'assistant',
+              content: `Conversation summary: ${title}`,
+              metadata: { system: true },
+            });
+          }
         }
 
         // Store user message
@@ -163,9 +192,10 @@ export async function chatRoutes(fastify: FastifyInstance) {
             console.error('[ChatRoute] Error in async query processing:', queryId, error);
             fastify.log.error({ error, queryId }, 'Error in async query processing');
           });
-      } catch (error) {
+      } catch (err) {
+        const error = err as Error;
         fastify.log.error({ error, username, conversationId, message }, 'Error processing message');
-        await reply.code(500).send({
+        void reply.code(500).send({
           error: 'Failed to process message',
           details: error instanceof Error ? error.message : 'Unknown error',
         });
@@ -363,6 +393,32 @@ export async function chatRoutes(fastify: FastifyInstance) {
           error: 'Failed to fetch query status',
           details: error instanceof Error ? error.message : 'Unknown error',
         });
+      }
+    }
+  );
+
+  /**
+   * DELETE /api/chat/conversation/:id
+   * Delete a conversation and its messages
+   */
+  fastify.delete<{ Params: { id: string } }>(
+    '/api/chat/conversation/:id',
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      const { id } = request.params;
+      try {
+        // Simple access control: ensure conversation exists
+        const conv = await getConversation(id);
+        if (!conv) {
+          void reply.code(404).send({ error: 'Conversation not found' });
+          return;
+        }
+
+        await deleteConversation(id);
+        void reply.code(200).send({ success: true });
+      } catch (err) {
+        const error = err as Error;
+        console.error('[ChatRoute] Error deleting conversation', { error, conversationId: id });
+        void reply.code(500).send({ error: 'Failed to delete conversation' });
       }
     }
   );

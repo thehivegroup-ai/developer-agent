@@ -29,6 +29,7 @@ export {
   getConversation,
   getConversationsByUser,
   updateConversationTitle,
+  deleteConversation,
   createMessage,
   getMessagesByConversation,
   createQuery,

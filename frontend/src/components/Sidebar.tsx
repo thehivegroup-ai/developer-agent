@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useChat } from '../context/ChatContext';
 import './Sidebar.css';
 
@@ -7,6 +7,28 @@ export default function Sidebar() {
     useChat();
   const [showActions, setShowActions] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      // Check if click is outside the menu and menu button
+      if (
+        showActions &&
+        !target.closest('.conversation-actions') &&
+        !target.closest('.conversation-menu-button')
+      ) {
+        setShowActions(null);
+      }
+    };
+
+    if (showActions) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showActions]);
 
   const filteredConversations = useMemo(() => {
     if (!searchQuery.trim()) return conversations;
@@ -71,6 +93,43 @@ export default function Sidebar() {
     setShowActions(null);
   };
 
+  const deleteConversation = async (conversationId: string) => {
+    const conversation = conversations.find((c) => c.id === conversationId);
+    if (!conversation) return;
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete "${conversation.title || 'this conversation'}"? This action cannot be undone.`
+    );
+
+    if (!confirmDelete) {
+      setShowActions(null);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/chat/conversation/${conversationId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete conversation');
+      }
+
+      // If we deleted the current conversation, create a new one
+      if (currentConversation?.id === conversationId) {
+        createConversation();
+      }
+
+      // Refresh conversations list (ChatContext will handle this via useEffect)
+      window.location.reload(); // Simple approach - could be more elegant with proper state management
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      alert('Failed to delete conversation. Please try again.');
+    }
+
+    setShowActions(null);
+  };
+
   return (
     <div className="sidebar">
       <div className="sidebar-header">
@@ -130,6 +189,13 @@ export default function Sidebar() {
               <div className="conversation-actions">
                 <button onClick={() => exportConversation(conv.id)}>💾 Export JSON</button>
                 <button onClick={() => exportAsMarkdown(conv.id)}>📝 Export Markdown</button>
+                <button
+                  onClick={() => deleteConversation(conv.id)}
+                  className="delete-button"
+                  title="Delete conversation"
+                >
+                  🗑️ Delete
+                </button>
               </div>
             )}
           </div>
