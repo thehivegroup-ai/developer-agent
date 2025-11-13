@@ -24,31 +24,16 @@ const __dirname = dirname(__filename);
 const workspaceRoot = join(__dirname, '..', '..');
 config({ path: join(workspaceRoot, '.env.local') });
 
-import type { Server } from 'node:http';
-import type {
-  TaskManager,
-  AgentCard,
-  A2AMessage,
-  A2ATask,
-  MessageSendParams,
-  MessageSendResult,
-  TasksGetParams,
-  TasksGetResult,
-  TasksCancelParams,
-  TasksCancelResult,
-  JsonRpcTransport,
-} from '@developer-agent/shared';
+import express from 'express';
+import type { AgentCard } from '@a2a-js/sdk';
 import {
-  TaskState,
-  TaskManager as TaskManagerImpl,
-  InMemoryTaskStorage,
-  JsonRpcTransport as JsonRpcTransportImpl,
-  AgentCardTemplates,
-  createA2AError,
-  A2AErrorCode,
-  isTextPart,
-} from '@developer-agent/shared';
+  DefaultRequestHandler,
+  InMemoryTaskStore,
+  DefaultExecutionEventBusManager,
+} from '@a2a-js/sdk/server';
+import { A2AExpressApp } from '@a2a-js/sdk/server/express';
 import { BaseRelationshipAgent } from './BaseRelationshipAgent.js';
+import { RelationshipAgentExecutor } from './executors/index.js';
 
 /**
  * Configuration options for Relationship Agent A2A Server.
@@ -60,349 +45,166 @@ interface RelationshipAgentA2AServerConfig {
 }
 
 /**
- * Relationship Agent implementation for A2A server
- */
-class RelationshipAgentImpl extends BaseRelationshipAgent {
-  constructor() {
-    super({
-      agentType: 'relationship',
-    });
-  }
-
-  async init(): Promise<void> {
-    console.log('✅ Relationship Agent initialized');
-  }
-
-  async handleRequest(request: unknown): Promise<unknown> {
-    console.log('[Relationship Agent] Handling request:', request);
-    return { status: 'processed' };
-  }
-
-  async shutdown(): Promise<void> {
-    console.log('🔄 Relationship Agent cleanup complete');
-  }
-}
-
-/**
  * A2A HTTP Server for Relationship Agent
  *
  * Implements the A2A Protocol v0.3.0 specification for knowledge graph operations.
  */
 export class RelationshipAgentA2AServer {
   private readonly config: Required<RelationshipAgentA2AServerConfig>;
-  private readonly agent: RelationshipAgentImpl;
-  private readonly taskManager: TaskManager;
-  private readonly transport: JsonRpcTransport;
+  private readonly agent: BaseRelationshipAgent;
   private readonly agentCard: AgentCard;
-  private server?: Server;
+  private readonly executor: RelationshipAgentExecutor;
+  private app?: express.Application;
+  private server?: ReturnType<typeof express.application.listen>;
+  private requestHandler?: DefaultRequestHandler;
+  private taskStore?: InMemoryTaskStore;
+  private eventBusManager?: DefaultExecutionEventBusManager;
 
   constructor(config: RelationshipAgentA2AServerConfig = {}) {
+    const port = config.port ?? 3004;
     this.config = {
-      port: config.port ?? 3004,
+      port,
       enableLogging: config.enableLogging ?? true,
-      baseUrl: config.baseUrl ?? `http://localhost:${config.port ?? 3004}`,
+      baseUrl: config.baseUrl ?? `http://localhost:${port}`,
     };
 
     // Initialize Relationship Agent
-    this.agent = new RelationshipAgentImpl();
+    this.agent = new BaseRelationshipAgent();
 
-    // Initialize Task Manager with in-memory storage
-    this.taskManager = new TaskManagerImpl(new InMemoryTaskStorage());
-
-    // Initialize JSON-RPC transport
-    this.transport = new JsonRpcTransportImpl({
-      enableLogging: this.config.enableLogging,
-    });
-
-    // Build Agent Card
-    this.agentCard = AgentCardTemplates.relationshipAgent(this.config.baseUrl).build();
-
-    // Register RPC methods
-    this.registerMethods();
-  }
-
-  /**
-   * Register all A2A RPC methods.
-   */
-  private registerMethods(): void {
-    // message/send - Send message and create/update task
-    this.transport.registerMethod('message/send', async (params: MessageSendParams) => {
-      return this.handleMessageSend(params);
-    });
-
-    // tasks/get - Get task status
-    this.transport.registerMethod('tasks/get', async (params: TasksGetParams) => {
-      return this.handleTasksGet(params);
-    });
-
-    // tasks/cancel - Cancel a task
-    this.transport.registerMethod('tasks/cancel', async (params: TasksCancelParams) => {
-      return this.handleTasksCancel(params);
-    });
-  }
-
-  /**
-   * Handle message/send RPC method.
-   *
-   * Creates or updates a task and processes the message through Relationship Agent.
-   */
-  private async handleMessageSend(params: MessageSendParams): Promise<MessageSendResult> {
-    if (this.config.enableLogging) {
-      console.log(
-        '[RelationshipAgent A2A] message/send received:',
-        JSON.stringify(params, null, 2)
-      );
-    }
-
-    // Validate required parameters
-    if (!params.message) {
-      throw createA2AError(-32602, 'Missing required parameter: message');
-    }
-    if (!params.message.parts || !Array.isArray(params.message.parts)) {
-      throw createA2AError(-32602, 'Missing or invalid message.parts');
-    }
-    if (params.message.parts.length === 0) {
-      throw createA2AError(-32602, 'message.parts cannot be empty');
-    }
-
-    // Extract message content and top-level metadata (supports both locations per A2A spec flexibility)
-    const { message, taskId } = params;
-    const paramsWithExtras = params as MessageSendParams & {
-      contextId?: string;
-      metadata?: Record<string, unknown>;
-    };
-    const contextId = paramsWithExtras.contextId;
-    const metadata = paramsWithExtras.metadata;
-
-    // Validate message
-    if (!message.parts || message.parts.length === 0) {
-      throw createA2AError(
-        A2AErrorCode.UNSUPPORTED_MESSAGE_FORMAT,
-        'Message must contain at least one part'
-      );
-    }
-
-    // Create or get existing task
-    let task: A2ATask;
-    if (taskId) {
-      task = await this.taskManager.getTask(taskId);
-    } else {
-      task = await this.taskManager.createTask({
-        contextId: contextId || message.contextId,
-        message: 'Processing relationship operation',
-        metadata: metadata || message.metadata,
-      });
-    }
-
-    // Build A2A message
-    const a2aMessage: A2AMessage = {
-      messageId: `msg-${Date.now()}-${Math.random().toString(36).substring(7)}`,
-      taskId: task.id,
-      role: message.role,
-      parts: message.parts,
-      timestamp: new Date().toISOString(),
-      contextId: message.contextId,
-      metadata: message.metadata,
+    // Build Agent Card with @a2a-js format
+    this.agentCard = {
+      version: '1.0.0',
+      name: 'Relationship Agent',
+      description:
+        'Specialized agent for relationship analysis including knowledge graphs, cross-repository relationships, and entity dependency tracking.',
+      url: this.config.baseUrl,
+      protocolVersion: '0.3.0',
+      capabilities: {},
+      defaultInputModes: ['text/plain', 'application/json'],
+      defaultOutputModes: ['text/plain', 'application/json'],
+      skills: [
+        {
+          id: 'relationship-analysis',
+          name: 'Relationship Analysis',
+          description:
+            'Analyzes and maps relationships between code entities, repositories, and dependencies',
+          tags: ['relationships', 'knowledge-graph', 'dependencies', 'entities'],
+        },
+      ],
+      provider: {
+        organization: 'TheHiveGroup AI',
+        url: 'https://github.com/thehivegroup-ai',
+      },
     };
 
-    // Start task if it's in submitted state
-    if (task.status.state === TaskState.SUBMITTED) {
-      await this.taskManager.startTask(task.id, 'Processing relationship operation');
-    }
-
-    try {
-      // Extract text from message parts
-      const textParts = a2aMessage.parts.filter(isTextPart);
-      const messageText = textParts.map((part) => part.text).join('\n');
-
-      if (!messageText) {
-        throw createA2AError(
-          A2AErrorCode.UNSUPPORTED_MESSAGE_FORMAT,
-          'Message must contain at least one text part'
-        );
-      }
-
-      // Parse the message to determine action
-      // Expected formats:
-      // - "build graph: <description>"
-      // - "analyze relationships: <query>"
-      // - "find connections: <query>"
-      // - "track dependency: <description>"
-
-      let action: string;
-      let parameters: Record<string, unknown> = {};
-
-      if (messageText.toLowerCase().startsWith('build graph:')) {
-        action = 'buildGraph';
-        const description = messageText.substring('build graph:'.length).trim();
-        parameters = { description };
-      } else if (messageText.toLowerCase().startsWith('analyze relationships:')) {
-        action = 'analyzeRelationships';
-        const query = messageText.substring('analyze relationships:'.length).trim();
-        parameters = { query };
-      } else if (messageText.toLowerCase().startsWith('find connections:')) {
-        action = 'findConnections';
-        const query = messageText.substring('find connections:'.length).trim();
-        parameters = { query };
-      } else if (messageText.toLowerCase().startsWith('track dependency:')) {
-        action = 'trackDependency';
-        const description = messageText.substring('track dependency:'.length).trim();
-        parameters = { description };
-      } else {
-        // Accept generic messages for testing/compatibility
-        action = 'generic';
-        parameters = { text: messageText };
-      }
-
-      // Only process if we have a recognized operation
-      if (action && action !== 'generic') {
-        await this.taskManager.updateTaskStatus(task.id, {
-          message: `Processing ${action} operation`,
-          state: TaskState.WORKING,
-        });
-      } else {
-        // Generic message handling
-        await this.taskManager.updateTaskStatus(task.id, {
-          message: 'Message received',
-          state: TaskState.WORKING,
-        });
-      }
-
-      // Start async processing (don't wait for completion)
-      this.processMessageAsync(task.id, action, parameters).catch((error) => {
-        if (this.config.enableLogging) {
-          console.error('[RelationshipAgent A2A] Background processing error:', error);
-        }
-      });
-
-      // Get current task state (should be WORKING)
-      task = await this.taskManager.getTask(task.id);
-
-      return {
-        task,
-        messageId: a2aMessage.messageId,
-      };
-    } catch (error) {
-      // Mark task as failed
-      await this.taskManager.failTask(task.id, error as Error);
-
-      // Re-throw the error
-      throw error;
-    }
+    // Initialize executor with the agent instance
+    this.executor = new RelationshipAgentExecutor(this.agent);
   }
 
   /**
-   * Process message asynchronously
-   */
-  private async processMessageAsync(
-    taskId: string,
-    action: string,
-    parameters: Record<string, unknown>
-  ): Promise<void> {
-    try {
-      // Log the operation
-      if (this.config.enableLogging) {
-        console.log(`[RelationshipAgent A2A] Executing ${action} with parameters:`, parameters);
-      }
-
-      // Add delay to simulate processing time
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Complete the task
-      await this.taskManager.updateTaskStatus(taskId, {
-        message: action !== 'generic' ? `${action} completed successfully` : 'Message processed',
-        state: TaskState.COMPLETED,
-      });
-    } catch (error) {
-      await this.taskManager.failTask(taskId, error as Error);
-    }
-  }
-
-  /**
-   * Handle tasks/get RPC method.
-   *
-   * Retrieves task status by ID.
-   */
-  private async handleTasksGet(params: TasksGetParams): Promise<TasksGetResult> {
-    if (this.config.enableLogging) {
-      console.log('[RelationshipAgent A2A] tasks/get received:', JSON.stringify(params, null, 2));
-    }
-
-    const task = await this.taskManager.getTask(params.taskId);
-
-    return { task };
-  }
-
-  /**
-   * Handle tasks/cancel RPC method.
-   *
-   * Cancels a running task.
-   */
-  private async handleTasksCancel(params: TasksCancelParams): Promise<TasksCancelResult> {
-    if (this.config.enableLogging) {
-      console.log(
-        '[RelationshipAgent A2A] tasks/cancel received:',
-        JSON.stringify(params, null, 2)
-      );
-    }
-
-    const task = await this.taskManager.cancelTask(params.taskId, params.reason);
-
-    return { task };
-  }
-
-  /**
-   * Start the A2A HTTP server
+   * Start the A2A server
    */
   async start(): Promise<void> {
-    console.log('[Relationship Agent A2A] Starting server...');
+    // Create @a2a-js components
+    this.taskStore = new InMemoryTaskStore();
+    this.eventBusManager = new DefaultExecutionEventBusManager();
+    this.requestHandler = new DefaultRequestHandler(
+      this.agentCard,
+      this.taskStore,
+      this.executor,
+      this.eventBusManager
+    );
 
-    // Initialize agent
-    await this.agent.init();
+    // Create Express app
+    this.app = express();
+    this.app.use(express.json());
 
-    // Create Express app with JSON-RPC transport
-    const app = this.transport.createApp();
+    if (this.config.enableLogging) {
+      this.app.use((req, _res, next) => {
+        console.log(`${req.method} ${req.path}`);
+        next();
+      });
+    }
 
-    // Serve Agent Card at /.well-known/agent-card.json
-    app.get('/.well-known/agent-card.json', (_req, res) => {
-      res.json(this.agentCard);
+    // Health check endpoint
+    this.app.get('/health', (_req, res) => {
+      res.json({ status: 'healthy', timestamp: new Date().toISOString() });
     });
 
-    // Start HTTP server
-    this.server = app.listen(this.config.port, () => {
-      console.log(`[Relationship Agent A2A] Server listening on ${this.config.baseUrl}`);
-      console.log(
-        `[Relationship Agent A2A] Agent Card: ${this.config.baseUrl}/.well-known/agent-card.json`
-      );
-      console.log(`[Relationship Agent A2A] Health check: ${this.config.baseUrl}/health`);
+    // Setup A2A routes using @a2a-js SDK
+    const a2aApp = new A2AExpressApp(this.requestHandler);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+    a2aApp.setupRoutes(this.app as any); // Type assertion needed - Express vs Application type mismatch
+
+    // Start server
+    await new Promise<void>((resolve) => {
+      this.server = this.app!.listen(this.config.port, () => {
+        console.log(`Relationship Agent A2A Server listening on port ${this.config.port}`);
+        console.log(`Agent Card available at: ${this.config.baseUrl}/.well-known/agent-card.json`);
+        resolve();
+      });
     });
   }
 
   /**
-   * Stop the A2A HTTP server
+   * Stop the A2A server
    */
   async stop(): Promise<void> {
-    console.log('[Relationship Agent A2A] Shutting down...');
-
     if (this.server) {
-      await new Promise<void>((resolve) => {
-        this.server?.close(() => resolve());
+      await new Promise<void>((resolve, reject) => {
+        this.server!.close((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
       });
+      this.server = undefined;
     }
 
-    await this.agent.shutdown();
-    console.log('[Relationship Agent A2A] Server stopped');
+    // Cleanup executor
+    if (this.executor) {
+      await this.executor.cleanup?.();
+    }
+
+    console.log('Relationship Agent A2A Server stopped');
+  }
+
+  /**
+   * Get the Express app (for testing)
+   */
+  getApp(): express.Application | undefined {
+    return this.app;
+  }
+
+  /**
+   * Get the request handler (for testing)
+   */
+  getRequestHandler(): DefaultRequestHandler | undefined {
+    return this.requestHandler;
+  }
+
+  /**
+   * Get the agent instance (for testing)
+   */
+  getAgent(): BaseRelationshipAgent {
+    return this.agent;
   }
 }
 
+/**
+ * Main entry point
+ */
 async function main(): Promise<void> {
+  // Use dedicated port 3004 (not PORT env var - that's for API Gateway on port 3000)
+  const port = Number.parseInt(process.env.RELATIONSHIP_AGENT_PORT || '3004', 10);
   const server = new RelationshipAgentA2AServer({
-    enableLogging: true,
+    port,
+    enableLogging: process.env.ENABLE_LOGGING !== 'false',
+    baseUrl: process.env.RELATIONSHIP_AGENT_BASE_URL || `http://localhost:${port}`,
   });
 
   await server.start();
 
-  // Handle graceful shutdown
+  // Graceful shutdown
   process.on('SIGINT', () => {
     console.log('\nShutting down...');
     void server.stop().then(() => process.exit(0));
@@ -417,10 +219,16 @@ async function main(): Promise<void> {
   await new Promise(() => {}); // Never resolves, keeps event loop alive
 }
 
-// Run if executed directly
-try {
-  await main();
-} catch (error) {
-  console.error('Fatal error starting Relationship Agent A2A Server:', error);
-  process.exit(1);
+// Run if this is the main module
+// When running with tsx or node --import, process.argv[1] may be undefined
+const isMainModule =
+  import.meta.url === `file://${process.argv[1]}` ||
+  process.argv[1] === undefined ||
+  import.meta.url.endsWith(process.argv[1]?.replaceAll('\\', '/') || '');
+
+if (isMainModule) {
+  await main().catch((error) => {
+    console.error('Failed to start Relationship Agent A2A server:', error);
+    process.exit(1);
+  });
 }

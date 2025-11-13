@@ -24,25 +24,15 @@ const workspaceRoot = join(__dirname, '..', '..');
 config({ path: join(workspaceRoot, '.env.local') });
 
 import express from 'express';
+import type { AgentCard } from '@a2a-js/sdk';
 import {
-  JsonRpcTransport,
-  TaskManager,
-  AgentCardTemplates,
-  MessageSendParams,
-  MessageSendResult,
-  TasksGetParams,
-  TasksGetResult,
-  TasksCancelParams,
-  TasksCancelResult,
-  A2AMessage,
-  TaskState,
-  isTextPart,
-  A2AErrorCode,
-  createA2AError,
-  Artifact,
-} from '@developer-agent/shared';
+  DefaultRequestHandler,
+  InMemoryTaskStore,
+  DefaultExecutionEventBusManager,
+} from '@a2a-js/sdk/server';
+import { A2AExpressApp } from '@a2a-js/sdk/server/express';
 import { DeveloperAgent } from './index.js';
-import { randomUUID } from 'node:crypto';
+import { DeveloperAgentExecutor } from './executors/index.js';
 
 /**
  * A2A HTTP Server configuration
@@ -74,12 +64,14 @@ export interface A2AServerConfig {
  */
 export class DeveloperAgentA2AServer {
   private readonly config: Required<A2AServerConfig>;
-  private readonly transport: JsonRpcTransport;
-  private readonly taskManager: TaskManager;
+  private readonly agentCard: AgentCard;
   private readonly agent: DeveloperAgent;
-  private readonly agentCard: string;
+  private readonly executor: DeveloperAgentExecutor;
   private app?: express.Application;
   private server?: ReturnType<typeof express.application.listen>;
+  private requestHandler?: DefaultRequestHandler;
+  private taskStore?: InMemoryTaskStore;
+  private eventBusManager?: DefaultExecutionEventBusManager;
 
   constructor(config: A2AServerConfig = {}) {
     this.config = {
@@ -88,211 +80,34 @@ export class DeveloperAgentA2AServer {
       enableLogging: config.enableLogging ?? false,
     };
 
-    // Initialize components
-    this.agent = new DeveloperAgent();
-    this.taskManager = new TaskManager();
-    this.transport = new JsonRpcTransport({
-      enableLogging: this.config.enableLogging,
-    });
-
-    // Build Agent Card
-    this.agentCard = AgentCardTemplates.developerAgent(this.config.baseUrl)
-      .setOwner({
-        name: 'TheHiveGroup AI',
+    // Create Agent Card following @a2a-js SDK format
+    this.agentCard = {
+      version: '1.0.0', // Agent version
+      name: 'Developer Agent',
+      description:
+        'Central orchestrator for analyzing GitHub repositories and building knowledge graphs. Decomposes complex tasks and coordinates specialized agents (GitHub, Repository, Relationship).',
+      url: this.config.baseUrl,
+      protocolVersion: '0.3.0',
+      capabilities: {}, // Optional capabilities - using defaults
+      defaultInputModes: ['text/plain', 'application/json'],
+      defaultOutputModes: ['text/plain', 'application/json'],
+      skills: [
+        {
+          id: 'analyze-repository',
+          name: 'Repository Analysis',
+          description: 'Analyze GitHub repositories and build knowledge graphs',
+          tags: ['repository', 'analysis', 'knowledge-graph'],
+        },
+      ],
+      provider: {
+        organization: 'TheHiveGroup AI',
         url: 'https://github.com/thehivegroup-ai',
-      })
-      .buildJson();
-
-    // Register A2A RPC methods
-    this.registerMethods();
-  }
-
-  /**
-   * Register all A2A RPC methods.
-   */
-  private registerMethods(): void {
-    // message/send - Send message and create/update task
-    this.transport.registerMethod('message/send', async (params: MessageSendParams) => {
-      return this.handleMessageSend(params);
-    });
-
-    // tasks/get - Get task status
-    this.transport.registerMethod('tasks/get', async (params: TasksGetParams) => {
-      return this.handleTasksGet(params);
-    });
-
-    // tasks/cancel - Cancel a task
-    this.transport.registerMethod('tasks/cancel', async (params: TasksCancelParams) => {
-      return this.handleTasksCancel(params);
-    });
-  }
-
-  /**
-   * Handle message/send RPC method.
-   *
-   * Creates a new task or continues an existing one, processes the message,
-   * and returns the updated task.
-   */
-  private async handleMessageSend(params: MessageSendParams): Promise<MessageSendResult> {
-    // Reduced logging: Only log in development
-    // console.log(`📨 message/send START`);
-
-    // Validate required parameters
-    if (!params.message) {
-      throw createA2AError(-32602, 'Missing required parameter: message');
-    }
-    if (!params.message.parts || !Array.isArray(params.message.parts)) {
-      throw createA2AError(-32602, 'Missing or invalid message.parts');
-    }
-    if (params.message.parts.length === 0) {
-      throw createA2AError(-32602, 'message.parts cannot be empty');
-    }
-
-    // Extract message content and top-level metadata (supports both locations per A2A spec flexibility)
-    const { message, taskId } = params;
-    const paramsWithExtras = params as MessageSendParams & {
-      contextId?: string;
-      metadata?: Record<string, unknown>;
-    };
-    const contextId = paramsWithExtras.contextId;
-    const metadata = paramsWithExtras.metadata;
-
-    // Get or create task
-    let task;
-    if (taskId) {
-      // Continue existing task
-      task = await this.taskManager.getTask(taskId);
-    } else {
-      // Create new task with contextId and metadata from either message or top-level params
-      task = await this.taskManager.createTask({
-        contextId: contextId || message.contextId,
-        message: 'Processing request',
-        metadata: metadata || message.metadata,
-      });
-    }
-
-    // Create A2A message with ID
-    const a2aMessage: A2AMessage = {
-      messageId: randomUUID(),
-      taskId: task.id,
-      role: message.role,
-      parts: message.parts,
-      timestamp: new Date().toISOString(),
-      contextId: message.contextId,
-      metadata: message.metadata,
+      },
     };
 
-    // Start task if it's in submitted state
-    if (task.status.state === TaskState.SUBMITTED) {
-      await this.taskManager.startTask(task.id, 'Processing message');
-    }
-
-    // Extract text from message parts for validation
-    const textParts = a2aMessage.parts.filter(isTextPart);
-    const messageText = textParts.map((part) => part.text).join('\n');
-
-    if (!messageText) {
-      throw createA2AError(
-        A2AErrorCode.UNSUPPORTED_MESSAGE_FORMAT,
-        'Message must contain at least one text part'
-      );
-    }
-
-    // Reduced logging: Comment out verbose async start log
-    // console.log(`🚀 Async START ${task.id}`);
-
-    // Start async processing (don't wait for completion)
-    // This allows message/send to return quickly with task in WORKING state
-    this.processMessageAsync(task.id, messageText).catch((error) => {
-      console.error(`❌ Background error:`, error);
-    });
-
-    // Get current task state (should be WORKING)
-    task = await this.taskManager.getTask(task.id);
-
-    return {
-      task,
-      messageId: a2aMessage.messageId,
-    };
-  }
-
-  /**
-   * Process message asynchronously
-   */
-  private async processMessageAsync(taskId: string, messageText: string): Promise<void> {
-    try {
-      // Reduced logging: Comment out verbose process log
-      // console.log(`⚙️ processMessageAsync ${taskId}`);
-
-      // Process message with Developer Agent with 5 minute timeout
-      // API Gateway handles overall timeout with stale detection (2 min no response)
-      const timeoutMs = 300000; // 5 minutes - long enough for complex operations
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => {
-          console.error(`⏰ TIMEOUT ${timeoutMs}ms`);
-          reject(new Error(`Request processing timed out after ${timeoutMs / 1000} seconds`));
-        }, timeoutMs);
-      });
-
-      // Reduced logging: Comment out verbose handleRequest log
-      // console.log(`🔄 calling agent.handleRequest`);
-      const result = await Promise.race([
-        this.agent.handleRequest({
-          query: messageText,
-          taskId: taskId,
-        }),
-        timeoutPromise,
-      ]);
-      // Reduced logging: Comment out verbose result dump
-      // console.log(`✅ Agent result:`, result);
-
-      // Add small delay to simulate processing time
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      // Create artifact from result
-      const artifacts: Artifact[] = [];
-      if (result) {
-        artifacts.push({
-          id: randomUUID(),
-          name: 'Query Result',
-          mimeType: 'application/json',
-          uri: `data:application/json;base64,${Buffer.from(JSON.stringify(result)).toString('base64')}`,
-          description: 'Result from developer agent query processing',
-        });
-      }
-
-      // Update task with result as artifacts
-      await this.taskManager.completeTask(taskId, 'Request completed successfully', artifacts);
-    } catch (error) {
-      // Mark task as failed
-      await this.taskManager.failTask(taskId, error as Error);
-    }
-  }
-
-  /**
-   * Handle tasks/get RPC method.
-   *
-   * Retrieves task status by ID.
-   */
-  private async handleTasksGet(params: { taskId: string }): Promise<TasksGetResult> {
-    const task = await this.taskManager.getTask(params.taskId);
-    return { task };
-  }
-
-  /**
-   * Handle tasks/cancel RPC method.
-   *
-   * Cancels a running task.
-   */
-  private async handleTasksCancel(params: TasksCancelParams): Promise<TasksCancelResult> {
-    // Reduced logging: Only log in development if explicitly enabled
-    // if (this.config.enableLogging) {
-    //   console.log('[DeveloperAgent A2A] tasks/cancel received:', JSON.stringify(params, null, 2));
-    // }
-
-    const task = await this.taskManager.cancelTask(params.taskId, params.reason);
-
-    return { task };
+    // Initialize agent and executor
+    this.agent = new DeveloperAgent();
+    this.executor = new DeveloperAgentExecutor(this.agent);
   }
 
   /**
@@ -304,17 +119,29 @@ export class DeveloperAgentA2AServer {
     // Initialize agent
     await this.agent.init();
 
+    // Create @a2a-js components
+    this.taskStore = new InMemoryTaskStore();
+    this.eventBusManager = new DefaultExecutionEventBusManager();
+    this.requestHandler = new DefaultRequestHandler(
+      this.agentCard,
+      this.taskStore,
+      this.executor,
+      this.eventBusManager
+    );
+
     // Create Express app
     this.app = express();
+    this.app.use(express.json());
 
-    // Add JSON-RPC transport middleware
-    this.app.use('/', this.transport.middleware());
-
-    // Add Agent Card endpoint
-    this.app.get('/.well-known/agent-card.json', (_req, res) => {
-      res.setHeader('Content-Type', 'application/json');
-      res.send(this.agentCard);
+    // Health check endpoint
+    this.app.get('/health', (_req, res) => {
+      res.json({ status: 'healthy', timestamp: new Date().toISOString() });
     });
+
+    // Setup A2A routes using @a2a-js SDK
+    const a2aApp = new A2AExpressApp(this.requestHandler);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+    a2aApp.setupRoutes(this.app as any); // Type assertion needed - Express vs Application type mismatch
 
     // Start server
     return new Promise((resolve, reject) => {
@@ -365,10 +192,10 @@ export class DeveloperAgentA2AServer {
   }
 
   /**
-   * Get the task manager (for testing).
+   * Get the request handler (for testing).
    */
-  getTaskManager(): TaskManager {
-    return this.taskManager;
+  getRequestHandler(): DefaultRequestHandler | undefined {
+    return this.requestHandler;
   }
 
   /**
@@ -405,7 +232,15 @@ async function main(): Promise<void> {
 }
 
 // Run if this is the main module
-main().catch((error) => {
-  console.error('Failed to start Developer Agent A2A server:', error);
-  process.exit(1);
-});
+// When running with tsx or node --import, process.argv[1] may be undefined
+const isMainModule =
+  import.meta.url === `file://${process.argv[1]}` ||
+  process.argv[1] === undefined ||
+  import.meta.url.endsWith(process.argv[1]?.replaceAll('\\', '/') || '');
+
+if (isMainModule) {
+  await main().catch((error) => {
+    console.error('Failed to start Developer Agent A2A server:', error);
+    process.exit(1);
+  });
+}
