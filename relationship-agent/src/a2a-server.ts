@@ -25,6 +25,7 @@ const workspaceRoot = join(__dirname, '..', '..');
 config({ path: join(workspaceRoot, '.env.local') });
 
 import express from 'express';
+import cors from 'cors';
 import type { AgentCard } from '@a2a-js/sdk';
 import {
   DefaultRequestHandler,
@@ -32,7 +33,7 @@ import {
   DefaultExecutionEventBusManager,
 } from '@a2a-js/sdk/server';
 import { A2AExpressApp } from '@a2a-js/sdk/server/express';
-import { BaseRelationshipAgent } from './BaseRelationshipAgent.js';
+import { RelationshipAgent } from './index.js';
 import { RelationshipAgentExecutor } from './executors/index.js';
 
 /**
@@ -51,7 +52,7 @@ interface RelationshipAgentA2AServerConfig {
  */
 export class RelationshipAgentA2AServer {
   private readonly config: Required<RelationshipAgentA2AServerConfig>;
-  private readonly agent: BaseRelationshipAgent;
+  private readonly agent: RelationshipAgent;
   private readonly agentCard: AgentCard;
   private readonly executor: RelationshipAgentExecutor;
   private app?: express.Application;
@@ -69,7 +70,7 @@ export class RelationshipAgentA2AServer {
     };
 
     // Initialize Relationship Agent
-    this.agent = new BaseRelationshipAgent();
+    this.agent = new RelationshipAgent();
 
     // Build Agent Card with @a2a-js format
     this.agentCard = {
@@ -83,6 +84,18 @@ export class RelationshipAgentA2AServer {
       defaultInputModes: ['text/plain', 'application/json'],
       defaultOutputModes: ['text/plain', 'application/json'],
       skills: [
+        {
+          id: 'build-knowledge-graph',
+          name: 'Build Knowledge Graph',
+          description: 'Build and maintain knowledge graphs of repository relationships',
+          tags: ['knowledge-graph', 'graph-database', 'neo4j'],
+        },
+        {
+          id: 'query-relationships',
+          name: 'Query Relationships',
+          description: 'Query and traverse relationship graphs to find connections',
+          tags: ['relationships', 'query', 'graph-traversal'],
+        },
         {
           id: 'relationship-analysis',
           name: 'Relationship Analysis',
@@ -117,6 +130,17 @@ export class RelationshipAgentA2AServer {
 
     // Create Express app
     this.app = express();
+
+    // Enable CORS for all routes
+    this.app.use(
+      cors({
+        origin: '*',
+        methods: ['GET', 'POST', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+        credentials: false,
+      })
+    );
+
     this.app.use(express.json());
 
     if (this.config.enableLogging) {
@@ -160,10 +184,7 @@ export class RelationshipAgentA2AServer {
       this.server = undefined;
     }
 
-    // Cleanup executor
-    if (this.executor) {
-      await this.executor.cleanup?.();
-    }
+    // Note: RelationshipAgentExecutor doesn't have a cleanup method
 
     console.log('Relationship Agent A2A Server stopped');
   }
@@ -185,7 +206,7 @@ export class RelationshipAgentA2AServer {
   /**
    * Get the agent instance (for testing)
    */
-  getAgent(): BaseRelationshipAgent {
+  getAgent(): RelationshipAgent {
     return this.agent;
   }
 }

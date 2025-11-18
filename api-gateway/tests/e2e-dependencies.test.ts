@@ -95,6 +95,9 @@ describe('E2E: Repository Dependencies Analysis', () => {
       // Step 4: Validate result contains dependency analysis
       console.log('\n📦 Step 4: Validating dependency analysis result...\n');
 
+      // Log the completion event to see what happened
+      console.log('Completion event:', JSON.stringify(completionEvent, null, 2));
+
       expect(completionEvent.status).toBe('completed');
 
       // Extract and decode result

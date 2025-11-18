@@ -1,4 +1,5 @@
 ---
+description: 'Security best practices and standards for writing secure code across all projects.'
 applyTo: '**'
 ---
 

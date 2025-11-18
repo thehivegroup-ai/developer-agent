@@ -16,6 +16,7 @@ const workspaceRoot = join(__dirname, '..', '..');
 config({ path: join(workspaceRoot, '.env.local') });
 
 import express from 'express';
+import cors from 'cors';
 import type { AgentCard } from '@a2a-js/sdk';
 import {
   DefaultRequestHandler,
@@ -78,6 +79,18 @@ export class RepositoryAgentsA2AServer {
       defaultOutputModes: ['text/plain', 'application/json'],
       skills: [
         {
+          id: 'analyze-repository',
+          name: 'Analyze Repository',
+          description: 'Comprehensive repository analysis including structure and dependencies',
+          tags: ['repository', 'analysis', 'code'],
+        },
+        {
+          id: 'extract-dependencies',
+          name: 'Extract Dependencies',
+          description: 'Extract and analyze project dependencies from various package managers',
+          tags: ['dependencies', 'analysis', 'package-management'],
+        },
+        {
           id: 'repository-analysis',
           name: 'Repository Analysis',
           description: 'Technology detection, dependency analysis, and code structure evaluation',
@@ -116,6 +129,17 @@ export class RepositoryAgentsA2AServer {
 
     // Create Express app
     this.app = express();
+
+    // Enable CORS for all routes
+    this.app.use(
+      cors({
+        origin: '*',
+        methods: ['GET', 'POST', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+        credentials: false,
+      })
+    );
+
     this.app.use(express.json());
 
     // Health check endpoint

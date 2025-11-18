@@ -1,4 +1,5 @@
 ---
+description: 'Standards for managing environment variables and configuration files across all projects.'
 applyTo: '**/.env*,**/config/**,**/*.config.js,**/*.config.ts,**/*.config.json'
 ---
 

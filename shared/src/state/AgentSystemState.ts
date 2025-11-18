@@ -1,4 +1,4 @@
-import { AgentMetadata, TaskStatus } from '@developer-agent/shared';
+import { AgentMetadata, TaskStatus } from '../types.js';
 
 /**
  * LangGraph state schema for the multi-agent system
@@ -166,7 +166,11 @@ export class StateManager {
   /**
    * Update a task
    */
-  static updateTask(state: AgentSystemState, taskId: string, updates: Partial<Task>): AgentSystemState {
+  static updateTask(
+    state: AgentSystemState,
+    taskId: string,
+    updates: Partial<Task>
+  ): AgentSystemState {
     return {
       ...state,
       tasks: state.tasks.map((task) =>

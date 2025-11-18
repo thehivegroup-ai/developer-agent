@@ -575,7 +575,7 @@ DO NOT ask for more details if you can answer using the tools. The tools provide
             console.log(`🔧 Executing tool: ${toolCall.name}`, toolCall.args);
             const result = await tool.func(toolCall.args as any); // Type assertion needed for dynamic tool calls
             toolResults.push({
-              tool_call_id: toolCall.id,
+              tool_call_id: toolCall.id || `tool-${Date.now()}`,
               role: 'tool',
               content: result,
             });

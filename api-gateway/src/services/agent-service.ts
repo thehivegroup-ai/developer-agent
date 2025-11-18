@@ -112,12 +112,14 @@ export class AgentService {
       );
 
       console.log('[AgentService] Calling developerAgentClient.sendMessage...');
-      const { task } = await this.developerAgentClient.sendMessage({
+      const response = await this.developerAgentClient.sendMessage({
         message: {
+          kind: 'message',
+          messageId: queryId, // Use queryId as the unique messageId
           role: 'user',
           parts: [
             {
-              type: 'text',
+              kind: 'text', // A2A Protocol uses 'kind', not 'type'
               text: contextString
                 ? `Previous conversation:\n${contextString}\n\nCurrent question: ${query}`
                 : query,
@@ -131,11 +133,120 @@ export class AgentService {
         },
       });
 
-      console.log('[AgentService] Received task:', task.id, 'state:', task.status.state);
+      console.log('[AgentService] Full response:', JSON.stringify(response, null, 2));
+      console.log('[AgentService] Response type:', typeof response);
+      console.log(
+        '[AgentService] Response keys:',
+        response ? Object.keys(response as any) : 'null'
+      );
+
+      // The @a2a-js SDK returns the result directly (which is the Task object)
+      // not wrapped as { task: Task }, so we need to handle both formats
+      const task = (response as any).task || response;
+
+      console.log('[AgentService] Extracted task:', JSON.stringify(task, null, 2));
+      console.log('[AgentService] Task.id:', task?.id);
+
+      if (!task || !task.id) {
+        throw new Error(`Invalid response from Developer Agent: ${JSON.stringify(response)}`);
+      }
+
+      console.log('[AgentService] Received task:', task.id, 'state:', task.status?.state);
       websocketService.emitAgentSpawned(threadId, 'DeveloperAgent', task.id);
 
-      // Poll for task completion
+      // Check if task is already completed
+      if (task.status?.state === 'completed') {
+        console.log('[AgentService] Task already completed, fetching final state with artifacts');
+
+        // Small delay to ensure event bus has published all artifacts to TaskStore
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // Query the task again to ensure we have all artifacts
+        // (There may be a race condition where the task is marked completed
+        // but artifacts haven't been published to the TaskStore yet)
+        try {
+          const finalTaskResponse = await this.developerAgentClient.getTask(task.id);
+          // Handle both wrapped ({task}) and unwrapped (task) responses
+          const finalTask = (finalTaskResponse as any).task || finalTaskResponse;
+          console.log('[AgentService] Final task state:', JSON.stringify(finalTask, null, 2));
+
+          const result = finalTask.artifacts ||
+            task.artifacts || { status: 'completed', message: task.status.message };
+
+          // Mark as completed
+          await updateQueryStatus({
+            queryId,
+            status: 'completed',
+            progress: 100,
+            result,
+          });
+
+          websocketService.emitQueryCompleted(threadId, queryId, 'completed', result);
+          return result;
+        } catch (error) {
+          console.error('[AgentService] Error fetching final task state:', error);
+          // Fall back to using artifacts from initial response
+          const result = task.artifacts || { status: 'completed', message: task.status.message };
+
+          await updateQueryStatus({
+            queryId,
+            status: 'completed',
+            progress: 100,
+            result,
+          });
+
+          websocketService.emitQueryCompleted(threadId, queryId, 'completed', result);
+          return result;
+        }
+      }
+
+      // Task is still in progress - poll for completion
+      // BUT check if task might complete very quickly (race condition)
+      console.log(
+        '[AgentService] Task in progress, will poll for completion. Current state:',
+        task.status?.state
+      );
+
+      // Add small delay before first poll to let very fast tasks complete
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Try to get task once more before starting aggressive polling
+      try {
+        const checkTaskResponse = await this.developerAgentClient.getTask(task.id);
+        const checkTask = (checkTaskResponse as any).task || checkTaskResponse;
+
+        if (checkTask.status?.state === 'completed') {
+          console.log('[AgentService] Task completed during initial delay, returning artifacts');
+          const result = checkTask.artifacts || {
+            status: 'completed',
+            message: checkTask.status.message,
+          };
+
+          await updateQueryStatus({
+            queryId,
+            status: 'completed',
+            progress: 100,
+            result,
+          });
+
+          websocketService.emitQueryCompleted(threadId, queryId, 'completed', result);
+          return result;
+        }
+      } catch (error) {
+        console.error(
+          '[AgentService] Error checking task after delay, will proceed to polling:',
+          error
+        );
+      }
+
+      // Poll for task completion if still in progress
       websocketService.emitQueryProgress(threadId, queryId, 30, 'Processing query...');
+
+      // Safety check: ensure task.id is defined before polling
+      if (!task || !task.id) {
+        throw new Error(`Cannot poll task: task.id is undefined. Task: ${JSON.stringify(task)}`);
+      }
+
       const result = await this.pollTaskCompletion(task.id, queryId, threadId);
 
       console.log('[AgentService] Task completed:', task.id);
@@ -283,7 +394,10 @@ export class AgentService {
       attempt++;
 
       try {
-        const { task } = await this.developerAgentClient.getTask(taskId);
+        const response = await this.developerAgentClient.getTask(taskId);
+        // The @a2a-js SDK returns the result directly (which is the Task object)
+        // not wrapped as { task: Task }
+        const task = (response as any).task || response;
         lastResponseTime = Date.now(); // Got a response, reset stale timer
 
         const progress = Math.min(30 + attempt * 2, 90); // 30-90%

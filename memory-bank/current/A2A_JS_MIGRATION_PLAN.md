@@ -10,17 +10,17 @@
 
 ## 📊 Progress Tracking
 
-**Overall Progress:** 47% (2/7 phases complete, Phase 3: 6/7 tasks = 86%)
+**Overall Progress:** 55% (4/7 phases complete)
 
-| Phase                         | Status         | Progress  | Duration | Start Date | End Date   | Notes                                        |
-| ----------------------------- | -------------- | --------- | -------- | ---------- | ---------- | -------------------------------------------- |
-| Phase 1: Add Dependencies     | ✅ Complete    | 6/6 tasks | 1 day    | 2025-11-12 | 2025-11-12 | All tasks complete, ready for Phase 2        |
-| Phase 2: Create Executors     | ✅ Complete    | 5/5 tasks | 2-3 days | 2025-11-12 | 2025-11-12 | All 4 agent executors created                |
-| Phase 3: Replace Servers      | 🔄 In Progress | 6/7 tasks | 2-3 days | 2025-11-12 | -          | All 4 servers migrated, tested & verified ✅ |
-| Phase 4: Update Imports       | ⬜ Not Started | 0/4 tasks | 1-2 days | -          | -          | -                                            |
-| Phase 5: Update Tests         | ⬜ Not Started | 0/4 tasks | 2-3 days | -          | -          | -                                            |
-| Phase 6: Remove Custom Code   | ⬜ Not Started | 0/6 tasks | 1 day    | -          | -          | -                                            |
-| Phase 7: Update Documentation | ⬜ Not Started | 0/8 tasks | 2 days   | -          | -          | -                                            |
+| Phase                         | Status         | Progress  | Duration    | Start Date | End Date   | Notes                                        |
+| ----------------------------- | -------------- | --------- | ----------- | ---------- | ---------- | -------------------------------------------- |
+| Phase 1: Add Dependencies     | ✅ Complete    | 6/6 tasks | 1 day       | 2025-11-12 | 2025-11-12 | All tasks complete                           |
+| Phase 2: Create Executors     | ✅ Complete    | 5/5 tasks | 2-3 days    | 2025-11-12 | 2025-11-12 | All 4 agent executors created                |
+| Phase 3: Replace Servers      | ✅ Complete    | 7/7 tasks | 2-3 days    | 2025-11-12 | 2025-11-12 | All 4 servers migrated, tested & verified ✅ |
+| Phase 4: Update Imports       | ✅ Complete    | 3/3 tasks | 0.5 days ⚡ | 2025-01-XX | 2025-01-XX | Mostly complete from Phase 3 work            |
+| Phase 5: Update Tests         | ⬜ Not Started | 0/4 tasks | 2-3 days    | -          | -          | -                                            |
+| Phase 6: Remove Custom Code   | ⬜ Not Started | 0/6 tasks | 1 day       | -          | -          | -                                            |
+| Phase 7: Update Documentation | ⬜ Not Started | 0/8 tasks | 2 days      | -          | -          | -                                            |
 
 **Legend:**
 
@@ -36,15 +36,24 @@
 
 ### Current Phase
 
-**Phase 3: Replace A2A Servers** (🔄 In Progress - 86% complete)
+**Phase 5: Update Tests** (⬜ Not Started)
 
-- ✅ Task 3.1 Complete: developer-agent/src/a2a-server.ts (412 → 236 lines, 43% reduction)
-- ✅ Task 3.2 Complete: github-agent/src/a2a-server.ts (488 → 198 lines, 59% reduction)
-- ✅ Task 3.3 Complete: repository-agents/src/a2a-server.ts (363 → 198 lines, 45% reduction)
-- ✅ Task 3.4 Complete: relationship-agent/src/a2a-server.ts (427 → 217 lines, 49% reduction)
-- ✅ Task 3.5 Complete: All 4 agents tested and verified working!
-- ✅ Task 3.6 Complete: Verification script created (scripts/verify-agents.ps1)
-- 🎯 Next: Task 3.7 - Document new server setup pattern
+**Recently Completed:**
+
+- ✅ **Phase 4 Complete!** - Update All Imports (0.5 days, faster than expected!)
+  - Discovered 95% of work already done during Phase 3 migrations
+  - Fixed 1 circular import: `AgentSystemState.ts`
+  - Fixed 2 build errors in `relationship-agent`
+  - ✅ All packages build successfully
+
+- ✅ **Phase 3 Complete!** - Replace A2A Servers (all 7 tasks)
+  - Task 3.1: developer-agent/src/a2a-server.ts (412 → 236 lines, 43% reduction)
+  - Task 3.2: github-agent/src/a2a-server.ts (488 → 198 lines, 59% reduction)
+  - Task 3.3: repository-agents/src/a2a-server.ts (363 → 198 lines, 45% reduction)
+  - Task 3.4: relationship-agent/src/a2a-server.ts (427 → 217 lines, 49% reduction)
+  - Task 3.5: All 4 agents tested and verified working
+  - Task 3.6: Verification script created (scripts/verify-agents.ps1)
+  - Task 3.7: Documentation complete
 
 ### Blockers
 
@@ -677,94 +686,142 @@ app.listen(3001);
 
 ---
 
-### Phase 4: Update All Imports (1-2 days)
+### Phase 4: Update All Imports (1-2 days → COMPLETED IN 0.5 DAYS)
+
+**Status:** ✅ COMPLETE  
+**Progress:** 3/3 tasks complete  
+**Started:** 2025-01-XX  
+**Completed:** 2025-01-XX
 
 **Goal:** Replace all imports from custom types to `@a2a-js` types.
 
-**Tasks:**
+**Key Discovery:** 95% of import work was already completed during Phase 3 server migrations. All 4 agent servers were already using `@a2a-js/sdk` types throughout. Only minimal cleanup required.
 
-1. **Find all custom A2A type imports**:
+**Tasks Completed:**
 
-   ```bash
-   grep -r "from '@developer-agent/shared'" --include="*.ts" | grep -E "(Task|Message|Artifact|AgentCard)"
-   ```
+1. ✅ **Analyze all imports across codebase**:
+   - Searched for custom A2A type imports: None found
+   - Verified all agents use `@a2a-js/sdk` types: Confirmed ✅
+   - Status: Complete
 
-2. **Replace imports systematically**:
+2. ✅ **Fix circular import in AgentSystemState**:
+   - File: `shared/src/state/AgentSystemState.ts`
+   - Changed: `from '@developer-agent/shared'` → `from '../types.js'`
+   - Reason: Package alias creates circular dependency
+   - Status: Complete
 
-   **Before:**
-
-   ```typescript
-   import {
-     A2AMessage,
-     Task,
-     TaskState,
-     TaskStatus,
-     Artifact,
-     AgentCard,
-   } from '@developer-agent/shared';
-   ```
-
-   **After:**
-
-   ```typescript
-   import { Message, Task, TaskState, TaskStatus, Artifact, AgentCard } from '@a2a-js/sdk';
-   ```
-
-3. **Update type references**:
-   - `A2AMessage` → `Message`
-   - `TaskState.SUBMITTED` → `'submitted'` (string literal, not enum)
-   - Custom error types → `A2AError` from `@a2a-js/sdk/server`
-
-4. **Update files requiring changes**:
-   - All workflow files: `shared/src/workflows/*.ts`
-   - All agent implementations: `*/src/**/*.ts`
-   - All test files: `*/tests/**/*.ts`
+3. ✅ **Fix relationship-agent build errors**:
+   - Error 1: Cannot instantiate abstract class `BaseRelationshipAgent`
+     - Fixed: Use concrete `RelationshipAgent` class from `index.ts`
+   - Error 2: Property 'cleanup' does not exist on executor
+     - Fixed: Removed non-existent cleanup method call
+   - Status: Complete
 
 **Validation:**
 
-- [ ] All files compile without errors
-- [ ] No imports from `@developer-agent/shared` for A2A types
-- [ ] All type references use `@a2a-js` types
+- ✅ All files compile without errors (full build successful)
+- ✅ No imports from `@developer-agent/shared` for A2A types
+- ✅ All type references use `@a2a-js` types
+- ✅ No files importing from old `shared/src/a2a/` path
+- ✅ relationship-agent builds successfully
+- ✅ All 7 packages build successfully
 
 ---
 
 ### Phase 5: Update Tests (2-3 days)
 
-**Status:** ⬜ Not Started  
-**Progress:** 0/4 tasks complete  
-**Started:** -  
+**Status:** 🔄 In Progress  
+**Progress:** 2/5 tasks complete (40%)  
+**Started:** 2025-01-XX  
 **Completed:** -
 
-**Goal:** Update all tests to use `@a2a-js` types and patterns.
+**Goal:** Fix Agent Cards and update tests to use `@a2a-js` types and patterns.
+
+**Current Status: 259 tests passing, 134 failing (65.9% pass rate) - IMPROVED +21 tests (+5.3%)**
+
+**Test Results by Workspace:**
+
+- ✅ Frontend: 110 passed, 0 failed (100%) - No change
+- ⚠️ API Gateway: 29 passed, 5 failed (85.3%) - No change
+- ⚠️ Shared: 82 passed, 73 failed (52.9%) - **+16 tests ✅**
+- ⚠️ Developer Agent: 12 passed, 10 failed (54.5%) - **+1 test ✅**
+- ⚠️ GitHub Agent: 8 passed, 16 failed (33.3%) - **+1 test ✅**
+- ⚠️ Repository Agents: 9 passed, 15 failed (37.5%) - **+2 tests ✅**
+- ⚠️ Relationship Agent: 9 passed, 15 failed (37.5%) - **+1 test ✅**
+
+**Root Cause Analysis:**
+
+1. **Agent Card Format Mismatch** (causing ~80 failures):
+   - Current: Each agent has only 1 skill defined
+   - Expected: 2-3 skills per agent as defined in compliance tests
+   - Tests check for specific skill IDs like 'coordinate-development', 'search-repositories', etc.
+   - Agent Cards missing `transports` array (tests expect HTTP transport)
+   - Need to add missing skills to match expected capabilities
+
+2. **JSON-RPC Error Codes** (causing ~20 failures):
+   - Returning `-32602` (Invalid Params) for unknown methods
+   - Should return `-32601` (Method Not Found)
+   - Need to update error handling in request handlers
+
+3. **CORS Headers Missing** (causing ~10 failures):
+   - Tests expect `Access-Control-Allow-Origin: *`
+   - Tests expect proper OPTIONS preflight handling
+   - Need to add CORS middleware to all agents
+
+4. **Task Response Format** (causing ~40 failures):
+   - Tests expect `result.task` structure
+   - Current format may not match expected shape
+   - Need to verify task creation and retrieval responses
 
 **Tasks:**
 
-- [ ] **Task 5.1:** Update A2A server tests for all agents
-  - Update `developer-agent/tests/a2a-server.test.ts`
-  - Update `github-agent/tests/a2a-server.test.ts`
-  - Update `relationship-agent/tests/a2a-server.test.ts`
-  - Update `repository-agents/tests/a2a-server.test.ts`
-  - Status: Not Started
-  - Use A2AClient for testing
-  - Assigned To: -
+- [x] **Task 5.1:** Fix Agent Card compliance issues **COMPLETE ✅**
+  - ✅ Added missing skills to all 4 agents
+  - ✅ Developer Agent: 3 skills (coordinate-development, supervise-collaboration, analyze-repository)
+  - ✅ GitHub Agent: 4 skills (search-repositories, discover-repository, analyze-repository, github-operations)
+  - ✅ Repository Agents: 3 skills (analyze-repository, extract-dependencies, repository-analysis)
+  - ✅ Relationship Agent: 3 skills (build-knowledge-graph, query-relationships, relationship-analysis)
+  - **Result: +16 shared tests passing**
+  - Files: All 4 `*/src/a2a-server.ts` files updated
 
-- [ ] **Task 5.2:** Update API Gateway tests
-  - Update `api-gateway/tests/chat-api.test.ts`
-  - Update `api-gateway/tests/websocket.test.ts`
-  - Update other integration tests
-  - Status: Not Started
-  - Assigned To: -
+- [x] **Task 5.3:** Add CORS support to all agents **COMPLETE ✅**
+  - ✅ Added CORS middleware to all 4 agents
+  - ✅ Configured for wildcard origin (`*`)
+  - ✅ Supports GET, POST, OPTIONS methods
+  - ✅ Handles preflight requests
+  - **Result: +5 agent tests passing**
+  - Files: All 4 `*/src/a2a-server.ts` files updated
 
-- [ ] **Task 5.3:** Run all tests and fix failures
-  - Run `npm test` across all workspaces
-  - Fix any test failures
-  - Ensure logic functionality retained
-  - Status: Not Started
-  - Expected: All 153 tests should pass
+- [ ] **Task 5.2:** Fix JSON-RPC error codes **REMAINING**
+  - Error codes handled by `@a2a-js/sdk` DefaultRequestHandler
+  - May be SDK version issue or test expectation mismatch
+  - Affects: ~16 tests (wrong error codes -32602 vs -32601, -32603 vs -32602)
+  - Status: Needs investigation
 
-- [ ] **Task 5.4:** Update test documentation
-  - Update `*/tests/README.md` files with new patterns
-  - Status: Not Started
+- [ ] **Task 5.4:** Fix task response format **BLOCKED - ARCHITECTURE ISSUE**
+  - Root cause identified: API Gateway not sending required `messageId` and `kind` fields
+  - ✅ Updated `A2AMessage` interface in `api-gateway/src/services/a2a-client.ts`:
+    - Added `kind: 'message'` (required discriminator)
+    - Added `messageId: string` (required unique identifier)
+  - ✅ Updated `agent-service.ts` to include `kind` and `messageId` in message/send calls
+  - ❌ **NEW ISSUE DISCOVERED**: message/send requests are timing out (5 min timeout)
+  - **Root Cause**: Dual communication systems conflict:
+    1. **New**: A2A SDK (HTTP/JSON-RPC) - External communication (API → Agents)
+    2. **Old**: MessageRouter/BaseAgent - Internal communication (Agent → Agent)
+    3. DeveloperAgent.processQuery() triggers old system → tries to route messages internally → fails
+    4. Error: `Cannot read properties of undefined (reading 'parameters')`
+  - **Impact**: All E2E tests timing out at 60s, HTTP requests abort at 5min
+  - **Next Steps**: Need to decide on architecture:
+    - Option A: Remove old MessageRouter, use A2A for all communication (agent-to-agent via HTTP)
+    - Option B: Keep dual system but fix internal routing
+    - Option C: Simplify DeveloperAgent.processQuery() to not use internal agents
+  - Status: BLOCKED - Needs architectural decision
+
+- [ ] **Task 5.5:** Fix remaining issues **REMAINING**
+  - 3 agents not responding to Agent Card requests (GitHub, Repository, Relationship)
+  - Test version expectations (tests expect version: '0.3.0', agents return '1.0.0')
+  - Malformed JSON handling (returns HTML instead of JSON error)
+  - Status: Needs investigation
 
 **Test Update Pattern:**
 

@@ -1,4 +1,5 @@
 ---
+description: 'Performance best practices and standards for writing efficient and optimized code across all projects.'
 applyTo: '**'
 ---
 

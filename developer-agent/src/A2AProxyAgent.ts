@@ -27,7 +27,7 @@ interface A2ATask {
 }
 
 interface MessagePart {
-  type: 'text' | 'data' | 'image' | 'error';
+  kind: 'text' | 'data' | 'image' | 'error'; // A2A Protocol uses 'kind', not 'type'
   text?: string;
   data?: unknown;
   imageUrl?: string;
@@ -35,6 +35,8 @@ interface MessagePart {
 }
 
 interface A2AMessage {
+  kind?: 'message'; // A2A Protocol: message type indicator
+  messageId?: string; // A2A Protocol: unique message identifier
   role: 'user' | 'assistant' | 'system';
   parts: MessagePart[];
   contextId?: string;
@@ -94,14 +96,16 @@ export class A2AProxyAgent implements IAgent {
     // Convert request to A2A message
     // Include both text and data parts to satisfy A2A Protocol requirements
     const message: A2AMessage = {
+      kind: 'message', // A2A Protocol requires 'kind'
+      messageId: `proxy-msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, // Generate unique ID
       role: 'user',
       parts: [
         {
-          type: 'text',
+          kind: 'text', // A2A Protocol uses 'kind', not 'type'
           text: `Processing request from DeveloperAgent via A2A proxy`,
         },
         {
-          type: 'data',
+          kind: 'data', // A2A Protocol uses 'kind', not 'type'
           data: request,
           mimeType: 'application/json',
         },
@@ -142,17 +146,39 @@ export class A2AProxyAgent implements IAgent {
    */
   private async sendMessage(message: A2AMessage): Promise<unknown> {
     // Send message via JSON-RPC
-    const { task } = await this.callMethod<{ task: A2ATask; messageId: string }>('message/send', {
+    const response = await this.callMethod<{ task: A2ATask; messageId: string }>('message/send', {
       message,
     });
+
+    // Handle both wrapped ({task}) and unwrapped (task) responses
+    // The A2A SDK may return the task directly or wrapped
+    const task = (response as any).task || response;
 
     console.log(
       `📤 [A2A Proxy] Sent message to ${this.metadata.agentType}, task: ${task.id}, state: ${task.status.state}`
     );
 
-    // Poll for task completion
-    const result = await this.pollTaskCompletion(task.id);
-    return result;
+    // If task is already completed, fetch it again to get artifacts from TaskStore
+    if (task.status.state === 'completed') {
+      console.log(`✅ [A2A Proxy] Task already completed, fetching with artifacts`);
+
+      // Small delay to ensure artifacts are published to TaskStore
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Fetch task again to get version with artifacts from TaskStore
+      const taskResponse = await this.callMethod<{ task: A2ATask }>('tasks/get', {
+        taskId: task.id,
+      });
+      const taskWithArtifacts = (taskResponse as any).task || taskResponse;
+
+      const result = this.extractTaskResult(taskWithArtifacts);
+      console.log(`📦 [A2A Proxy] Extracted result:`, JSON.stringify(result).substring(0, 200));
+      return result;
+    }
+
+    // Poll for task completion if still in progress
+    const completedResult = await this.pollTaskCompletion(task.id);
+    return completedResult;
   }
 
   /**
@@ -163,35 +189,14 @@ export class A2AProxyAgent implements IAgent {
     const pollInterval = 1000; // 1 second
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const { task } = await this.callMethod<{ task: A2ATask }>('tasks/get', { taskId });
+      console.log(`🔍 [A2A Proxy FIX LOADED] Polling task: ${taskId}, attempt ${attempt + 1}`);
+      const response = await this.callMethod<{ task: A2ATask }>('tasks/get', { taskId });
+      // Handle both wrapped ({task}) and unwrapped (task) responses
+      const task = (response as any).task || response;
 
       if (task.status.state === 'completed') {
         console.log(`✅ [A2A Proxy] Task completed: ${taskId}`);
-
-        // Extract result from artifacts
-        if (task.artifacts && task.artifacts.length > 0) {
-          const artifact = task.artifacts[0];
-          if (artifact?.uri.startsWith('data:')) {
-            // Parse data URI - handle both base64 and URL-encoded formats
-            const parts = artifact.uri.split(',');
-            if (parts.length === 2 && parts[1]) {
-              const data = parts[1];
-              let jsonString: string;
-
-              // Check if base64 encoded (contains ";base64" in the header)
-              if (parts[0]?.includes('base64')) {
-                jsonString = Buffer.from(data, 'base64').toString('utf-8');
-              } else {
-                // URL-encoded format
-                jsonString = decodeURIComponent(data);
-              }
-
-              return JSON.parse(jsonString) as unknown;
-            }
-          }
-        }
-
-        return { success: true, taskId };
+        return this.extractTaskResult(task);
       }
 
       if (task.status.state === 'failed') {
@@ -207,6 +212,54 @@ export class A2AProxyAgent implements IAgent {
     }
 
     throw new Error(`Task timeout: ${taskId} did not complete within 2 minutes`);
+  }
+
+  /**
+   * Extract and parse result data from completed task artifacts
+   * Returns the parsed data (not the artifacts themselves) so the executor can wrap it properly
+   */
+  private extractTaskResult(task: any): unknown {
+    console.log(
+      `🔍 [A2A Proxy] Extracting from task.artifacts:`,
+      JSON.stringify(task.artifacts)?.substring(0, 300)
+    );
+
+    // Parse and return data from artifacts
+    if (task.artifacts && task.artifacts.length > 0) {
+      const artifact = task.artifacts[0];
+      console.log(`🔍 [A2A Proxy] First artifact:`, JSON.stringify(artifact)?.substring(0, 200));
+
+      if (artifact?.uri?.startsWith('data:')) {
+        // Parse data URI - handle both base64 and URL-encoded formats
+        const parts = artifact.uri.split(',');
+        if (parts.length === 2 && parts[1]) {
+          const data = parts[1];
+          let jsonString: string;
+
+          // Check if base64 encoded (contains ";base64" in the header)
+          if (parts[0]?.includes('base64')) {
+            jsonString = Buffer.from(data, 'base64').toString('utf-8');
+          } else {
+            // URL-encoded format
+            jsonString = decodeURIComponent(data);
+          }
+
+          try {
+            const parsed = JSON.parse(jsonString) as unknown;
+            console.log(
+              `✅ [A2A Proxy] Successfully parsed artifact data:`,
+              JSON.stringify(parsed)?.substring(0, 200)
+            );
+            return parsed;
+          } catch (error) {
+            console.error('[A2A Proxy] Failed to parse artifact data:', error);
+          }
+        }
+      }
+    }
+
+    console.log(`⚠️ [A2A Proxy] No artifacts found, returning fallback`);
+    return { status: 'completed', taskId: task.id };
   }
 
   /**

@@ -23,7 +23,7 @@ interface JsonRpcResponse {
 }
 
 interface MessagePart {
-  type: 'text' | 'data' | 'image' | 'error';
+  kind: 'text' | 'data' | 'image' | 'error'; // A2A Protocol uses 'kind', not 'type'
   text?: string;
   data?: unknown;
   imageUrl?: string;
@@ -32,6 +32,8 @@ interface MessagePart {
 }
 
 interface A2AMessage {
+  kind: 'message'; // Required discriminator field
+  messageId: string; // Required unique identifier (UUID)
   role: 'user' | 'assistant' | 'system';
   parts: MessagePart[];
   contextId?: string;

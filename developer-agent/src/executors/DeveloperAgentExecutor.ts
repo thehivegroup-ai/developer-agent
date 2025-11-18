@@ -64,8 +64,8 @@ export class DeveloperAgentExecutor implements AgentExecutor {
       // Use contextId as threadId
       const threadId = requestContext.contextId;
 
-      // Process the query using the agent's logic
-      const result = await this.agent.processQuery(query, userId, threadId);
+      // Process the query using the agent's logic (LLM + A2A HTTP calls)
+      const result = await this.agent.processQueryWithLLM(query, userId, threadId);
 
       // Check if task was cancelled
       if (abortController.signal.aborted) {

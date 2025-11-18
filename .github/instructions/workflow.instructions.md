@@ -1,4 +1,5 @@
 ---
+description: 'Development workflow standards for version control, branching, committing, and code reviews applicable to all projects.'
 applyTo: '**'
 ---
 

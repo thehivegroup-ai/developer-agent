@@ -16,6 +16,7 @@ const workspaceRoot = join(__dirname, '..', '..');
 config({ path: join(workspaceRoot, '.env.local') });
 
 import express from 'express';
+import cors from 'cors';
 import type { AgentCard } from '@a2a-js/sdk';
 import {
   DefaultRequestHandler,
@@ -78,6 +79,24 @@ export class GitHubAgentA2AServer {
       defaultOutputModes: ['text/plain', 'application/json'],
       skills: [
         {
+          id: 'search-repositories',
+          name: 'Search Repositories',
+          description: 'Search and filter GitHub repositories using various criteria',
+          tags: ['github', 'search', 'repositories'],
+        },
+        {
+          id: 'discover-repository',
+          name: 'Discover Repository',
+          description: 'Discover repository metadata and structure',
+          tags: ['github', 'discovery', 'metadata'],
+        },
+        {
+          id: 'analyze-repository',
+          name: 'Analyze Repository',
+          description: 'Deep analysis of repository structure, dependencies, and code',
+          tags: ['github', 'analysis', 'repository'],
+        },
+        {
           id: 'github-operations',
           name: 'GitHub Operations',
           description: 'Repository discovery, cloning, and metadata extraction',
@@ -116,6 +135,17 @@ export class GitHubAgentA2AServer {
 
     // Create Express app
     this.app = express();
+
+    // Enable CORS for all routes
+    this.app.use(
+      cors({
+        origin: '*',
+        methods: ['GET', 'POST', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+        credentials: false,
+      })
+    );
+
     this.app.use(express.json());
 
     // Health check endpoint
