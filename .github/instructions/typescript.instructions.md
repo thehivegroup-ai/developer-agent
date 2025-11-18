@@ -1,4 +1,5 @@
 ---
+description: 'Comprehensive coding standards and best practices for writing TypeScript and JavaScript code across all projects.'
 applyTo: '**/*.ts,**/*.tsx,**/*.js,**/*.jsx'
 ---
 

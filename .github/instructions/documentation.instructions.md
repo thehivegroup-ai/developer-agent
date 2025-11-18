@@ -1,4 +1,5 @@
 ---
+description: 'Standards for organizing documentation in any repository, ensuring clarity, consistency, and maintainability across all projects.'
 applyTo: '**'
 ---
 

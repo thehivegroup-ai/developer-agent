@@ -1,4 +1,5 @@
 ---
+description: 'Standards and best practices for building and testing Node.js projects using npm, including monorepo management with workspaces.'
 applyTo: 'package.json,package-lock.json,**/package.json,tsconfig.json,**/tsconfig.json'
 ---
 
